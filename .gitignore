@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Embedded repos
+micro-agent/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# IDEs
+.idea/
+.vscode/
+
+# Build artifacts
+dist/
+build/

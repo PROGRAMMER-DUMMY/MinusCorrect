@@ -1,0 +1,11 @@
+# Cursor Rules
+
+Adhere strictly to .agent-rules/systemic-integrity.md for all tasks, bug fixes, and code generation.
+- Evidence Over Labels: Treat comments and docstrings as hypotheses; verify behavior against real call sites and test assertions.
+- Docstring Rules:
+  - Operational guarantees (O(1), thread-safe) must link to test fixtures (# verifies: tests/...).
+  - Contextual comments must use structured prefixes: # Rationale:, # Workaround:, or # Assumption:.
+  - Strip unverified marketing superlatives (universal, bulletproof, zero-dependency).
+- Golden Test Protection: Files in tests/golden/ are immutable contracts during implementation.
+- Root-Cause Resolution: Fix root causes at source; no broad exception swallowing or magic constants.
+- Iteration Ceiling: Limit test-iteration loops to 4 runs maximum.

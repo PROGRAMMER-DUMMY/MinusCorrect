@@ -1,0 +1,9 @@
+rules:
+  - id: unverified-docstring-superlatives
+    languages:
+      - python
+      - javascript
+      - typescript
+    severity: WARNING
+    message: "Aspirational docstring claim detected ($CLAIM). Either link an automated test receipt (# verifies: tests/...) or remove the superlative."
+    pattern-regex: '(?i)\b(thread-safe|O\(1\)|universal\s+parser|zero-dependency|bulletproof|blazing\s+fast|domain-agnostic)\b'
