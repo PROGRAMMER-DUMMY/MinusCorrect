@@ -18,9 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The Two-Category Docstring & Comment Auditing Standard (Operational Claims requiring test receipts vs. Tagged Contextual Rationale).
   - 4-Iteration failure ceiling with automated diagnostic escalation.
   - Scaffolding debug trace injection (`[DEBUG]`) and mandatory cleanup.
-- **Multi-Agent Native Bootstraps**:
-  - `CLAUDE.md`: Universal directives and docstring rules for Claude Code.
-  - `AGY.md`: Native operational directives for Google Antigravity (AGY).
+- **Universal Agent Standard & Bootstraps**:
+  - `AGENTS.md`: Universal repository standard for all autonomous coding agents (Claude Code, AGY, Codex, Cursor, Aider, OpenHands).
   - `.codex/instructions.md`: Rules and constraints for OpenAI Codex.
   - `.cursorrules`: Rules and constraints for Cursor IDE.
 - **Test Stratification Architecture**:

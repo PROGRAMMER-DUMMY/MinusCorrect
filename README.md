@@ -28,12 +28,12 @@ When autonomous coding agents work in real-world codebases, they suffer from wel
                       │  .agent-rules/systemic-integrity.md     │
                       └───────────────────┬────────────────────┘
                                           │ referenced by 1-line pointers
-          ┌───────────────────────────────┼──────────────────────────────┐
-          ▼                               ▼                              ▼
-     [CLAUDE.md]                      [AGY.md]                [.codex/instructions.md]
-    (Claude Code)                   (Antigravity)                  (Codex / Cursor)
-          │                               │                              │
-          └───────────────────────────────┼──────────────────────────────┘
+          ┌───────────────────────────────┴──────────────────────────────┐
+          ▼                                                              ▼
+     [AGENTS.md]                                               [.cursorrules / .codex]
+(Universal Agent Standard)                                         (IDE Bootstraps)
+          │                                                              │
+          └───────────────────────────────┬──────────────────────────────┘
                                           ▼
                       ┌────────────────────────────────────────┐
                       │    The Verification Boundary Model     │
@@ -120,8 +120,7 @@ When asking an agent to fix a bug or implement a feature:
 ├── tests/
 │   ├── golden/README.md              # Immutable acceptance contracts
 │   └── unit/README.md                # Mutable developer unit tests
-├── AGY.md                            # Native bootstrap for Google Antigravity (AGY)
-├── CLAUDE.md                         # Native bootstrap for Claude Code
+├── AGENTS.md                         # Universal agent standard (Claude Code, AGY, Codex, Cursor)
 ├── .codex/instructions.md            # Native bootstrap for Codex Agent
 └── .cursorrules                      # Native bootstrap for Cursor
 ```
