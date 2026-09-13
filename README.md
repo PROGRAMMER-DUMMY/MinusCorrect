@@ -4,10 +4,11 @@
 > Supported Environments: **Claude Code**, **Google Antigravity (AGY)**, **OpenAI Codex**, and **Cursor**.
 
 [![Systemic Integrity Verification](https://github.com/PROGRAMMER-DUMMY/MinusCorrect/actions/workflows/integrity.yml/badge.svg)](https://github.com/PROGRAMMER-DUMMY/MinusCorrect/actions/workflows/integrity.yml)
+[![Documentation](https://img.shields.io/badge/Documentation-Full%20Guides-green.svg)](docs/README.md)
 [![Architecture Docs](https://img.shields.io/badge/Architecture-Deep%20Dive-blueviolet.svg)](ARCHITECTURE.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> For an in-depth breakdown of the cybernetic control loop and threat model, see [**ARCHITECTURE.md**](ARCHITECTURE.md).
+> For full guides and documentation, see [**docs/README.md**](docs/README.md). For systems mechanics and threat models, see [**ARCHITECTURE.md**](ARCHITECTURE.md).
 
 ---
 
@@ -188,6 +189,14 @@ MinusCorrect enforces this exact discipline on autonomous AI systems. It transfo
 ├── .pre-commit-hooks.yaml            # Standard pre-commit hook definition for external repos
 ├── .semgrep/
 │   └── unverified-claims.yml         # Semgrep rule for docstring superlatives
+├── docs/                             # Modular documentation suite
+│   ├── README.md                     # Documentation hub and index
+│   ├── quickstart.md                 # Setup and daily workflows
+│   ├── golden-contracts.md           # Specification authoring & boundary enforcement
+│   ├── supervisor-guide.md           # Process supervision & atomic rollback
+│   ├── docstring-standard.md         # Two-Category docstring auditing
+│   ├── agent-matrix.md               # Claude Code, AGY, Codex, Cursor integration
+│   └── ci-governance.md              # Git host security & threat mitigation
 ├── scripts/
 │   ├── supervisor.py                 # Out-of-process agent supervisor with atomic rollback
 │   └── verify_integrity.py           # Cross-platform integrity verifier with --fix support
