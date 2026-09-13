@@ -4,12 +4,12 @@
 
 ---
 
-## 🏛️ Core Reference
+## Core Reference
 Read and adhere to the canonical rules in [`.agent-rules/systemic-integrity.md`](.agent-rules/systemic-integrity.md).
 
 ---
 
-## 🛡️ Non-Negotiable Operational Invariants
+## Non-Negotiable Operational Invariants
 
 ### 1. Evidence Over Labels
 * **Docstrings and comments are claims, not evidence.** Never accept self-reported text as ground truth.
@@ -46,7 +46,7 @@ Read and adhere to the canonical rules in [`.agent-rules/systemic-integrity.md`]
 
 ---
 
-## 🔍 Pre-Commit Verification
+## Pre-Commit Verification
 Before declaring any task complete or making a commit, run the local integrity verifier:
 ```bash
 python scripts/verify_integrity.py

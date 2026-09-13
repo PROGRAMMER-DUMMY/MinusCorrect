@@ -11,7 +11,7 @@
 
 ---
 
-## 🎯 The Problem
+## The Problem
 
 When autonomous coding agents work in real-world codebases, they suffer from well-documented failure modes:
 1. **Downstream Symptom Masking:** Rather than resolving bugs at the source, agents swallow exceptions (`try/except: pass`), add synthetic fallback defaults, or insert arbitrary `sleep()` delays to bypass concurrency bugs.
@@ -21,7 +21,7 @@ When autonomous coding agents work in real-world codebases, they suffer from wel
 
 ---
 
-## 🏛️ The Architecture
+## System Architecture & Boundary Model
 
 `MinusCorrect` implements a **hybrid verification boundary** developed through LLM Council peer reviews:
 
@@ -59,7 +59,7 @@ When autonomous coding agents work in real-world codebases, they suffer from wel
 
 ---
 
-## 🛡️ Core Rules & Invariants
+## Core Rules & Invariants
 
 ### 1. The Two-Category Docstring Standard
 * **Category 1: Operational Guarantees ("The What"):**
@@ -84,7 +84,7 @@ When autonomous coding agents work in real-world codebases, they suffer from wel
 
 ---
 
-## 🚀 Quickstart & Usage
+## Quickstart & Usage
 
 ### 1. Verify Local Integrity
 Run the built-in integrity checker:
@@ -109,7 +109,7 @@ When asking an agent to fix a bug or implement a feature:
 
 ---
 
-## 💡 Real-World Field Case Studies
+## Real-World Field Case Studies
 
 To understand how MinusCorrect operates in daily development, consider how it handles high-stakes scenarios where unguided AI agents routinely fail.
 
@@ -149,7 +149,7 @@ To understand how MinusCorrect operates in daily development, consider how it ha
 
 ---
 
-## 🧠 Why Evidence-First Engineering Mirrors Elite Problem Solving
+## Evidence-First Engineering Principles
 
 In senior engineering interviews, technical leadership evaluations, and research war rooms, high-performing engineers stand out not because they claim to write "flawless" code, but because of **how they structure and defend their solutions**:
 
@@ -162,7 +162,7 @@ MinusCorrect enforces this exact discipline on autonomous AI systems. It transfo
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 ├── .agent-rules/
@@ -183,5 +183,5 @@ MinusCorrect enforces this exact discipline on autonomous AI systems. It transfo
 
 ---
 
-## 📜 License
+## License
 MIT

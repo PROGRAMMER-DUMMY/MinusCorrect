@@ -4,7 +4,7 @@ Thank you for contributing to **MinusCorrect**! We welcome improvements to the s
 
 ---
 
-## 🛠️ Development & Contribution Workflow
+## Development & Contribution Workflow
 
 MinusCorrect practices what it preaches: all code modifications must pass our own Systemic Integrity verification.
 
@@ -45,5 +45,5 @@ Ensure that:
 
 ---
 
-## 📜 Code of Conduct
+## Code of Conduct
 Please be respectful, constructive, and direct in all discussions and pull requests.
