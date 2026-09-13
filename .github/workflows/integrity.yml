@@ -1,0 +1,31 @@
+name: Systemic Integrity Verification
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Systemic Integrity Verification
+        run: |
+          python scripts/verify_integrity.py
+
+      - name: Run Semgrep Claim Audits
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: .semgrep/unverified-claims.yml
+        continue-on-error: true
