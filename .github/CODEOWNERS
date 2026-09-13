@@ -1,0 +1,3 @@
+# Hard-lock golden acceptance contracts to human maintainers.
+# Any pull request modifying files in tests/golden/ requires explicit review and approval.
+/tests/golden/ @PROGRAMMER-DUMMY

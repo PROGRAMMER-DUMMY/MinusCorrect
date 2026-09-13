@@ -49,9 +49,9 @@ Read and adhere to the canonical rules in [`.agent-rules/systemic-integrity.md`]
 ## Pre-Commit Verification
 Before declaring any task complete or making a commit, run the local integrity verifier:
 ```bash
-python scripts/verify_integrity.py
+python scripts/verify_integrity.py --fix
 ```
 Ensure that:
-1. Golden tests in `tests/golden/` are untouched.
-2. No `[DEBUG]` logs or `console.log("__DEBUG__")` traces exist in source code.
+1. Golden tests in `tests/golden/` are untouched (protected by `.github/CODEOWNERS`).
+2. No `[DEBUG]` logs or `console.log("__DEBUG__")` traces exist in source code (`--fix` will automatically strip them).
 3. No unverified docstring superlatives were added without test receipts.

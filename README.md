@@ -84,28 +84,42 @@ When autonomous coding agents work in real-world codebases, they suffer from wel
 
 ---
 
-## Quickstart & Usage
+## Quickstart & Low-Overhead Usage
 
-### 1. Verify Local Integrity
-Run the built-in integrity checker:
+MinusCorrect is designed to **minimize human developer hours**. It automates cleanup, prevents broken git states on agent failure, and eliminates repetitive administrative tasks.
+
+### 1. Zero-Friction Integrity Check & Auto-Remediation
+Run the built-in verifier. Add `--fix` to automatically strip leftover `[DEBUG]` traces and re-stage files without manual editing:
 ```bash
-python scripts/verify_integrity.py
+python scripts/verify_integrity.py --fix
 ```
 
-### 2. Active Git Pre-Commit Hook
-The pre-commit hook is active at `.git/hooks/pre-commit`. It runs on every `git commit` to verify:
-* No unauthorized modifications to `tests/golden/`.
-* No committed `[DEBUG]` traces in source files.
-* No unverified docstring claims without test receipts.
+### 2. Autonomous Agent Execution Supervisor
+To prevent runaway loops from polluting your working tree, use the out-of-process supervisor. If an agent exceeds 4 iterations, it executes an **atomic rollback** to keep your branch pristine and writes a human-ready `DIAGNOSTIC-REPORT.md`:
+```bash
+python scripts/supervisor.py check --target src/cache.py --test-cmd "pytest tests/golden/test_cache.py" --iteration 1
+```
 
-*Break-glass override for intentional golden contract changes:*
+### 3. Active Git Pre-Commit Hook & Host-Level Protection
+* **Local Pre-Commit Hook:** Active at `.git/hooks/pre-commit`. Runs automatically on every `git commit`.
+* **Git Host CODEOWNERS:** Hard-locked via `.github/CODEOWNERS`. Unauthorized agent shell commits cannot modify `tests/golden/`.
+* **Standard Pre-Commit Package:** Any project can adopt MinusCorrect in 60 seconds by adding it to `.pre-commit-config.yaml`:
+  ```yaml
+  repos:
+    - repo: https://github.com/PROGRAMMER-DUMMY/MinusCorrect
+      rev: main
+      hooks:
+        - id: verify-integrity
+  ```
+
+*Break-glass override for intentional golden contract changes by human maintainers:*
 ```bash
 ALLOW_GOLDEN_EDIT=1 git commit -m "chore: update golden contract"
 ```
 
-### 3. Prompting Agents (Claude Code, Agy, Codex, Cursor)
-When asking an agent to fix a bug or implement a feature:
-> *"Implement the solution to pass `tests/golden/test_billing.py`. Note: `tests/golden/` is STRICTLY READ-ONLY. Mutate only `src/billing.py`. Adhere to `.agent-rules/systemic-integrity.md`."*
+### 4. Prompting Agents (Claude Code, Agy, Codex, Cursor)
+When dispatching an autonomous agent:
+> *"Implement the solution to pass `tests/golden/test_billing.py`. Note: `tests/golden/` is STRICTLY READ-ONLY. Mutate only `src/billing.py`. Adhere to `AGENTS.md`."*
 
 ---
 
@@ -167,12 +181,16 @@ MinusCorrect enforces this exact discipline on autonomous AI systems. It transfo
 ```
 ├── .agent-rules/
 │   └── systemic-integrity.md         # Canonical core specification
-├── .github/workflows/
-│   └── integrity.yml                 # Out-of-band CI verification
+├── .github/
+│   ├── CODEOWNERS                    # Hard-lock golden contracts at the Git host level
+│   └── workflows/
+│       └── integrity.yml             # Out-of-band CI verification
+├── .pre-commit-hooks.yaml            # Standard pre-commit hook definition for external repos
 ├── .semgrep/
 │   └── unverified-claims.yml         # Semgrep rule for docstring superlatives
 ├── scripts/
-│   └── verify_integrity.py           # Cross-platform integrity verification script
+│   ├── supervisor.py                 # Out-of-process agent supervisor with atomic rollback
+│   └── verify_integrity.py           # Cross-platform integrity verifier with --fix support
 ├── tests/
 │   ├── golden/README.md              # Immutable acceptance contracts
 │   └── unit/README.md                # Mutable developer unit tests

@@ -55,8 +55,8 @@ def get_staged_code_files():
     code_files = []
     for f in staged:
         ext = os.path.splitext(f)[1].lower()
-        # Exclude this script itself and documentation files
-        if ext in CODE_EXTENSIONS and not f.endswith("verify_integrity.py"):
+        # Exclude verification harness scripts and documentation files
+        if ext in CODE_EXTENSIONS and not f.startswith("scripts/"):
             code_files.append(f)
     return code_files
 
@@ -83,7 +83,7 @@ def check_golden_tests():
             
     return True, "Golden tests clean."
 
-def check_debug_tags():
+def check_debug_tags(auto_fix=False):
     """Verify that temporary [DEBUG] traces injected during agent loops are stripped from source code."""
     code_files = get_staged_code_files()
     if not code_files:
@@ -96,10 +96,23 @@ def check_debug_tags():
         diff_output = run_git_command(["diff", "--cached", "--", f])
         matches = debug_pattern.findall(diff_output)
         if matches:
-            violations.append(f)
+            if auto_fix:
+                # Automatically strip [DEBUG] lines and re-stage to save human hours
+                try:
+                    with open(f, "r", encoding="utf-8", errors="replace") as fp:
+                        lines = fp.readlines()
+                    cleaned_lines = [l for l in lines if "[DEBUG]" not in l and "__DEBUG__" not in l]
+                    with open(f, "w", encoding="utf-8") as fp:
+                        fp.writelines(cleaned_lines)
+                    run_git_command(["add", f])
+                    print(f"[AUTO-FIX] Stripped residual [DEBUG] logs from {f} and re-staged.")
+                except Exception as e:
+                    violations.append(f"{f} (Auto-fix failed: {e})")
+            else:
+                violations.append(f)
             
     if violations:
-        return False, f"[ERROR] Violation: Temporary agent debug logs detected in staged source files:\n  " + "\n  ".join(violations) + "\n  -> Clean up [DEBUG] logs before committing."
+        return False, f"[ERROR] Violation: Temporary agent debug logs detected in staged source files:\n  " + "\n  ".join(violations) + "\n  -> Run 'python scripts/verify_integrity.py --fix' to auto-clean and re-stage."
         
     return True, "No leftover debug tags in code files."
 
@@ -137,14 +150,15 @@ def check_unverified_claims():
     return True, "Docstring claims clean."
 
 def main():
-    print("[INFO] Running Systemic Integrity Pre-Commit Verification...")
+    auto_fix = "--fix" in sys.argv
+    print(f"[INFO] Running Systemic Integrity Pre-Commit Verification...{' (Auto-Fix Enabled)' if auto_fix else ''}")
     
     golden_ok, golden_msg = check_golden_tests()
     if not golden_ok:
         print(golden_msg, file=sys.stderr)
         sys.exit(1)
         
-    debug_ok, debug_msg = check_debug_tags()
+    debug_ok, debug_msg = check_debug_tags(auto_fix=auto_fix)
     if not debug_ok:
         print(debug_msg, file=sys.stderr)
         sys.exit(1)

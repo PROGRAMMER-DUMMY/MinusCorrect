@@ -1,0 +1,8 @@
+- id: verify-integrity
+  name: MinusCorrect Systemic Integrity Verifier
+  description: Verifies golden contract immutability, purges residual [DEBUG] logs, and audits operational docstring claims.
+  entry: python scripts/verify_integrity.py
+  language: python
+  stages: [commit]
+  always_run: true
+  pass_filenames: false
