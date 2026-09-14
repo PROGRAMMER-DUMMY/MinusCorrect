@@ -20,6 +20,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install dependencies
+        run: |
+          pip install pytest
+          pip install -e .
+
+      - name: Run Unit Test Suite
+        run: |
+          pytest tests/unit/
+
       - name: Run Systemic Integrity Verification
         run: |
           python scripts/verify_integrity.py
