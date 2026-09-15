@@ -128,11 +128,13 @@ class AgentSupervisor:
         self,
         session_id: str = "default",
         max_iterations: int = 4,
-        target_file: Optional[Path] = None
+        target_file: Optional[Path] = None,
+        timeout: float = 120.0
     ):
         self.session_id = session_id
         self.max_iterations = max_iterations
         self.target_file = target_file.resolve() if target_file else None
+        self.timeout = timeout
         self.state = SessionState.load(session_id)
         self.state.max_iterations = max_iterations
         if self.target_file and str(self.target_file) not in self.state.target_files:
@@ -141,11 +143,19 @@ class AgentSupervisor:
     def atomic_rollback(self) -> None:
         """
         Executes a Git-tree atomic rollback:
-        Discards all tracked changes and removes all untracked files.
+        Discards tracked changes and cleans untracked build artifacts,
+        while preserving developer secrets, virtualenvs, and configuration files (.env, .venv, etc.).
         """
         run_git_command(["checkout", "--", "."])
-        run_git_command(["clean", "-fd"])
-        print("[SUPERVISOR] Git-tree atomic rollback completed: All changes and untracked files discarded.")
+        run_git_command([
+            "clean", "-fd",
+            "-e", ".env*",
+            "-e", ".venv*",
+            "-e", "venv*",
+            "-e", "*.local",
+            "-e", ".minuscorrect*"
+        ])
+        print("[SUPERVISOR] Git-tree atomic rollback completed: Tracked changes reverted and build artifacts cleaned (configuration files preserved).")
 
     def write_diagnostic_report(
         self,
@@ -216,25 +226,34 @@ class AgentSupervisor:
                 break
         return count
 
-    def run_step(self, test_cmd: List[str]) -> Dict[str, Any]:
+    def run_step(self, test_cmd: List[str], timeout: Optional[float] = None) -> Dict[str, Any]:
         """
-        Executes a supervised test run, updating persistent session state.
+        Executes a supervised test run with execution timeout protection, updating persistent session state.
         """
         self.state.current_iteration += 1
         iteration = self.state.current_iteration
+        effective_timeout = timeout if timeout is not None else self.timeout
 
         print(f"\n[SUPERVISOR] Executing verification iteration {iteration}/{self.max_iterations} (Session: '{self.session_id}')...")
 
-        # Execute test command
-        res = subprocess.run(
-            test_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace"
-        )
-        code, out, err = res.returncode, res.stdout, res.stderr
+        # Execute test command with timeout protection
+        try:
+            res = subprocess.run(
+                test_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=effective_timeout
+            )
+            code, out, err = res.returncode, res.stdout, res.stderr
+        except subprocess.TimeoutExpired as exc:
+            code = 124  # Standard timeout exit code
+            out = exc.stdout or ""
+            err = (exc.stderr or "") + f"\n[SUPERVISOR TIMEOUT] Test execution timed out after {effective_timeout}s."
+            print(f"[SUPERVISOR] Execution TIMED OUT after {effective_timeout}s.")
+
         err_hash = compute_error_hash(err, out)
 
         step_record = {

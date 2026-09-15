@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--target", help="Target source file being modified")
     run_parser.add_argument("--session-id", default="default", help="Session ID for state persistence")
     run_parser.add_argument("--max-iterations", type=int, default=4, help="Maximum solver iterations before hard abort")
+    run_parser.add_argument("--timeout", type=float, default=120.0, help="Execution timeout in seconds (default: 120.0)")
     run_parser.add_argument("--reset", action="store_true", help="Reset session before execution")
     run_parser.add_argument("test_cmd", nargs=argparse.REMAINDER, help="Test command to execute (e.g. pytest tests/golden/)")
 
@@ -55,10 +56,12 @@ def handle_run(args: argparse.Namespace) -> int:
         return 1
 
     target_path = Path(args.target) if args.target else None
+    timeout_val = getattr(args, "timeout", 120.0)
     supervisor = AgentSupervisor(
         session_id=args.session_id,
         max_iterations=args.max_iterations,
-        target_file=target_path
+        target_file=target_path,
+        timeout=timeout_val
     )
 
     if args.reset:
@@ -125,6 +128,7 @@ def supervisor_main() -> int:
     parser.add_argument("--target", help="Target source file")
     parser.add_argument("--session-id", default="default")
     parser.add_argument("--max-iterations", type=int, default=4)
+    parser.add_argument("--timeout", type=float, default=120.0, help="Execution timeout in seconds")
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("test_cmd", nargs=argparse.REMAINDER)
 

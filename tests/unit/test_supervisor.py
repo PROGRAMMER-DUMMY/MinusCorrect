@@ -102,3 +102,59 @@ def test_supervisor_hard_abort_and_diagnostic_report(tmp_path, monkeypatch):
     content = report_path.read_text(encoding="utf-8")
     assert "HARD_ABORT" in content
     assert "persistent defect" in content
+
+
+def test_supervisor_execution_timeout(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    # Supervisor with a 0.2s timeout
+    supervisor = AgentSupervisor(session_id="test_timeout", max_iterations=4, timeout=0.2)
+
+    # Command that sleeps for 2 seconds (must trigger timeout)
+    res = supervisor.run_step(["python", "-c", "import time; time.sleep(2)"])
+
+    assert supervisor.state.current_iteration == 1
+    assert len(supervisor.state.history) == 1
+    record = supervisor.state.history[0]
+    assert record["exit_code"] == 124  # Timeout code
+    assert record["hash"] is not None
+
+
+def test_supervisor_safe_rollback_preserves_env(tmp_path, monkeypatch):
+    import subprocess
+    monkeypatch.chdir(tmp_path)
+
+    # Initialize a temporary git repo
+    subprocess.run(["git", "init"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], check=True)
+    subprocess.run(["git", "config", "user.name", "Tester"], check=True)
+
+    tracked = tmp_path / "main.py"
+    tracked.write_text("initial_code = True", encoding="utf-8")
+    subprocess.run(["git", "add", "main.py"], check=True)
+    subprocess.run(["git", "commit", "-m", "initial commit"], check=True, stdout=subprocess.DEVNULL)
+
+    # Agent creates untracked scratch file and modifies tracked file
+    tracked.write_text("corrupted_code = True", encoding="utf-8")
+    scratch = tmp_path / "agent_scratch.tmp"
+    scratch.write_text("temporary scratch", encoding="utf-8")
+
+    # Developer has an untracked .env file and .env.local
+    env_file = tmp_path / ".env"
+    env_file.write_text("SECRET_KEY=12345", encoding="utf-8")
+    env_local = tmp_path / ".env.local"
+    env_local.write_text("LOCAL_CONFIG=true", encoding="utf-8")
+
+    supervisor = AgentSupervisor(session_id="test_rollback", max_iterations=4)
+    supervisor.atomic_rollback()
+
+    # Verify tracked file was restored
+    assert tracked.read_text(encoding="utf-8") == "initial_code = True"
+    # Verify agent scratch was cleaned
+    assert not scratch.exists()
+    # Verify developer .env and .env.local were preserved
+    assert env_file.exists()
+    assert env_file.read_text(encoding="utf-8") == "SECRET_KEY=12345"
+    assert env_local.exists()
+    assert env_local.read_text(encoding="utf-8") == "LOCAL_CONFIG=true"
+
+

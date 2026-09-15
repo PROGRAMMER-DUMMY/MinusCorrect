@@ -18,9 +18,10 @@ def test_cli_parser_commands():
     parser = build_parser()
     
     # Subcommand: run
-    args_run = parser.parse_args(["run", "--session-id", "test-s1", "--", "pytest", "tests/"])
+    args_run = parser.parse_args(["run", "--session-id", "test-s1", "--timeout", "30.0", "--", "pytest", "tests/"])
     assert args_run.command == "run"
     assert args_run.session_id == "test-s1"
+    assert args_run.timeout == 30.0
     assert args_run.test_cmd == ["--", "pytest", "tests/"]
 
     # Subcommand: status

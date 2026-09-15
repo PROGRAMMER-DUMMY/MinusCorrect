@@ -104,18 +104,26 @@ The normalized trace is hashed with SHA-256 (truncated to 16 hex characters):
 
 ---
 
-## 5. Git-Tree Atomic Rollback
+## 5. Safe Git-Tree Atomic Rollback & Execution Timeouts
 
-When iteration 4 fails, the circuit breaker trips. Rather than leaving the human engineer with a broken workspace, the supervisor executes an **atomic git-tree rollback**:
+### Execution Timeout Protection
+To prevent test deadlocks, infinite loops, or hanging network requests from freezing the supervisor, test commands are executed with an enforced wall-clock timeout (default: 120 seconds, configurable via `--timeout`):
+
+- If a test exceeds the timeout threshold, the supervisor raises `subprocess.TimeoutExpired`, records exit code `124`, notes the timeout in `stderr`, and advances the loop counter.
+- This guarantees that process deadlocks trigger the circuit breaker rather than hanging indefinitely.
+
+### Safe Rollback with Secret & Configuration Preservation
+When iteration 4 fails, the circuit breaker trips. Rather than executing a destructive wipe of untracked developer files, the supervisor executes a **safe atomic rollback**:
 
 ```bash
 git checkout -- .
-git clean -fd
+git clean -fd -e ".env*" -e ".venv*" -e "venv*" -e "*.local" -e ".minuscorrect*"
 ```
 
 1. Reverts all modified tracked files across the repository to the pre-session state.
-2. Deletes any untracked or partially authored scratch files.
-3. Automatically writes `DIAGNOSTIC-REPORT.md` to the workspace root.
+2. Deletes untracked agent scratch files and temporary build artifacts.
+3. **Preserves developer secrets and configurations:** Untracked `.env`, `.env.local`, virtual environments (`.venv/`), and `.minuscorrect` state files are strictly preserved.
+4. Automatically writes `DIAGNOSTIC-REPORT.md` to the workspace root.
 
 ### Structure of `DIAGNOSTIC-REPORT.md`
 The generated report contains:
@@ -133,8 +141,8 @@ This reduces human intervention from 30–60 minutes of tedious git archaeology 
 MinusCorrect provides a unified CLI for supervisor operations:
 
 ```bash
-# Run a test under supervisor control
-minuscorrect run --session-id issue-402 -- pytest tests/golden/test_issue_402.py
+# Run a test under supervisor control with timeout (default: 120s)
+minuscorrect run --session-id issue-402 --timeout 60 -- pytest tests/golden/test_issue_402.py
 
 # Inspect active supervisor session status
 minuscorrect status --session-id issue-402
@@ -143,5 +151,5 @@ minuscorrect status --session-id issue-402
 minuscorrect reset --session-id issue-402
 
 # Direct runner entry point
-mc-supervisor --session-id issue-402 -- pytest tests/golden/test_issue_402.py
+mc-supervisor --session-id issue-402 --timeout 60 -- pytest tests/golden/test_issue_402.py
 ```
