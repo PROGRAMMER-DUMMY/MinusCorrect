@@ -98,3 +98,27 @@ Constraints & Operating Rules:
 5. Verification & Cleanup: Run test iterations using 'minuscorrect run -- pytest tests/golden/test_cache_lru.py'. Before completing the task, run 'minuscorrect verify --fix' to ensure all temporary debug traces are purged.
 6. Adhere strictly to AGENTS.md.
 ```
+
+---
+
+## 5. Defensive Production Incident Pipeline & RCA
+
+Ingest live production crashes (from Sentry, Datadog, or tracebacks) without risking credential leaks or prompt injection attacks:
+
+```bash
+# Ingest crash JSON or log, defang PII & injections, and create staged test
+minuscorrect incident crash_payload.json --id INC-1042
+
+# Or pipe directly via stdin
+cat crash.json | python scripts/incident_to_golden.py --id INC-1042
+```
+
+### What Happens Automatically:
+1. **PII & Credential Redaction:** Bearer tokens, JWTs, API keys, passwords, emails, IPs, and UUIDs are defanged.
+2. **Prompt Injection Neutralization:** Hostile LLM hijack tokens (`<system>`, `[SYSTEM INSTRUCTION]`, `IGNORE PREVIOUS INSTRUCTIONS`, `eval(`, `os.system`) are defanged before reaching test files or agent context.
+3. **Staged Reproduction Contract:** Generated in `tests/staging/test_incident_inc_1042.py`.
+4. **Automated Root Cause Analysis:** Generated in `INCIDENT-RCA-inc_1042.md`.
+5. **Controlled Contract Promotion:**
+   ```bash
+   ALLOW_GOLDEN_EDIT=1 git mv tests/staging/test_incident_inc_1042.py tests/golden/
+   ```

@@ -230,6 +230,18 @@ class AgentSupervisor:
         """
         Executes a supervised test run with execution timeout protection, updating persistent session state.
         """
+        from minuscorrect.verifier import check_golden_tests
+        golden_ok, golden_msg = check_golden_tests()
+        if not golden_ok:
+            print(f"\n[SUPERVISOR TAMPERING DETECTED]\n{golden_msg}")
+            self.state.status = "TAMPERING_DETECTED"
+            self.state.save()
+            return {
+                "status": "TAMPERING_DETECTED",
+                "error": golden_msg,
+                "iteration": self.state.current_iteration
+            }
+
         self.state.current_iteration += 1
         iteration = self.state.current_iteration
         effective_timeout = timeout if timeout is not None else self.timeout

@@ -42,6 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
     reset_parser = subparsers.add_parser("reset", help="Reset a supervisor session")
     reset_parser.add_argument("--session-id", default="default", help="Session ID to reset")
 
+    # Command: incident
+    incident_parser = subparsers.add_parser("incident", help="Defensively ingest incident crash telemetry and synthesize reproduction tests")
+    incident_parser.add_argument("payload", nargs="?", default="-", help="Path to crash payload file, or '-' for stdin")
+    incident_parser.add_argument("--id", dest="incident_id", help="Explicit incident ID (e.g. INC-1042)")
+    incident_parser.add_argument("--promote", action="store_true", help="Promote directly to tests/golden/ (requires ALLOW_GOLDEN_EDIT=1)")
+    incident_parser.add_argument("--output-dir", default="tests/staging", help="Output directory for staged test (default: tests/staging)")
+
     return parser
 
 
@@ -73,6 +80,8 @@ def handle_run(args: argparse.Namespace) -> int:
         return 0
     elif result["status"] == "HARD_ABORT":
         return 2
+    elif result["status"] == "TAMPERING_DETECTED":
+        return 3
     else:
         return 1
 
@@ -103,6 +112,48 @@ def handle_reset(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_incident(args: argparse.Namespace) -> int:
+    from minuscorrect.incident import (
+        generate_rca_report,
+        generate_staged_test,
+        parse_incident_payload,
+        promote_incident_to_golden,
+    )
+
+    if args.payload == "-" or not args.payload:
+        if sys.stdin.isatty():
+            print("[INFO] Paste crash payload JSON or traceback (press Ctrl+D or Ctrl+Z when done):", file=sys.stderr)
+        raw_content = sys.stdin.read()
+    else:
+        payload_file = Path(args.payload)
+        if not payload_file.exists():
+            print(f"[ERROR] Payload file not found: {payload_file}", file=sys.stderr)
+            return 1
+        raw_content = payload_file.read_text(encoding="utf-8", errors="replace")
+
+    if not raw_content.strip():
+        print("[ERROR] Empty incident payload received.", file=sys.stderr)
+        return 1
+
+    print("[INFO] Sanitizing incident payload (defanging prompt injections & redacting PII)...")
+    report = parse_incident_payload(raw=raw_content, incident_id=args.incident_id)
+
+    staged_test = generate_staged_test(report, output_dir=Path(args.output_dir))
+    print(f"[SUCCESS] Staged reproduction contract created: {staged_test.resolve()}")
+
+    rca_path = generate_rca_report(report)
+    print(f"[SUCCESS] Incident Root Cause Analysis (RCA) generated: {rca_path.resolve()}")
+
+    if args.promote:
+        ok, msg = promote_incident_to_golden(staged_test)
+        if not ok:
+            print(msg, file=sys.stderr)
+            return 1
+        print(f"[SUCCESS] {msg}")
+
+    return 0
+
+
 def main(argv: List[str] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -115,6 +166,8 @@ def main(argv: List[str] = None) -> int:
         return handle_status(args)
     elif args.command == "reset":
         return handle_reset(args)
+    elif args.command == "incident":
+        return handle_incident(args)
     else:
         parser.print_help()
         return 0

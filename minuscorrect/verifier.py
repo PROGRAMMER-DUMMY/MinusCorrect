@@ -58,31 +58,91 @@ def get_staged_code_files() -> List[str]:
 
 
 def check_golden_tests() -> Tuple[bool, str]:
-    """Verify that immutable tests in tests/golden/ are not modified during implementation."""
+    """Verify that immutable tests in tests/golden/ are not modified or added without ALLOW_GOLDEN_EDIT=1."""
     if os.environ.get("ALLOW_GOLDEN_EDIT") == "1":
         return True, "Golden test edit explicitly allowed via ALLOW_GOLDEN_EDIT=1."
 
-    staged_files = run_git_command(["diff", "--cached", "--name-only"]).splitlines()
-    modified_golden = [f for f in staged_files if f.startswith("tests/golden/")]
+    status_output = run_git_command(["status", "--porcelain"])
+    violations = []
+    for line in status_output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            status, path = parts[0], parts[1]
+            if path.startswith("tests/golden/"):
+                violations.append(f"{status} {path}")
 
-    if modified_golden:
-        status_output = run_git_command(["status", "--porcelain"])
-        violations = []
-        for line in status_output.splitlines():
-            parts = line.strip().split(None, 1)
-            if len(parts) == 2:
-                status, path = parts[0], parts[1]
-                if path.startswith("tests/golden/") and "M" in status:
-                    violations.append(path)
-
-        if violations:
-            return False, (
-                "[ERROR] Violation: Immutable golden tests modified in tests/golden/:\n  "
-                + "\n  ".join(violations)
-                + "\n  -> If contract change was approved, run: ALLOW_GOLDEN_EDIT=1 git commit"
-            )
+    if violations:
+        return False, (
+            "[ERROR] Violation: Immutable golden tests modified in tests/golden/:\n  "
+            + "\n  ".join(violations)
+            + "\n  -> If contract change was approved, run: ALLOW_GOLDEN_EDIT=1 git commit"
+        )
 
     return True, "Golden tests clean."
+
+
+def check_anti_swallowing(staged_only: bool = True) -> Tuple[bool, str]:
+    """
+    Detect the 'fix-by-swallowing' anti-pattern in added source lines.
+    Flags empty except blocks (e.g. 'except: pass' or 'except Exception: return None')
+    introduced without an explicit '# Rationale:' explanation.
+    """
+    code_files = get_staged_code_files()
+    if not code_files:
+        return True, "No staged code files to check."
+
+    violations = []
+    # Pattern detecting except followed directly by pass or return None/empty
+    swallow_inline_pattern = re.compile(
+        r"^\+\s*except.*:\s*(pass|return(\s+(None|\{\}|\[\]|''|\"\"|0))?)\s*(#.*)?$",
+        re.MULTILINE
+    )
+
+    for f in code_files:
+        diff_output = run_git_command(["diff", "--cached", "--", f])
+        lines = diff_output.splitlines()
+        for idx, line in enumerate(lines):
+            if not line.startswith("+") or line.startswith("+++"):
+                continue
+
+            # Check inline swallow: "except ...: pass"
+            if swallow_inline_pattern.match(line):
+                # Check if rationale is provided on the same line or adjacent lines
+                surrounding = "\n".join(lines[max(0, idx - 3):min(len(lines), idx + 4)])
+                if "# Rationale:" not in surrounding and "# Workaround:" not in surrounding:
+                    violations.append(
+                        f"{f}: Line '{line.strip()}' silently swallows exception without '# Rationale: <reason>'."
+                    )
+                    continue
+
+            # Check multiline swallow:
+            # + except ...:
+            # +     pass  OR  +     return None
+            if re.match(r"^\+\s*except(\s+[\w\s,()]+)?:\s*$", line):
+                next_idx = idx + 1
+                while next_idx < len(lines) and lines[next_idx].startswith("+") and not lines[next_idx].strip():
+                    next_idx += 1
+                if next_idx < len(lines) and lines[next_idx].startswith("+"):
+                    next_line = lines[next_idx]
+                    if re.match(r"^\+\s*(pass|return(\s+(None|\{\}|\[\]|''|\"\"|0))?)\s*(#.*)?$", next_line):
+                        surrounding = "\n".join(lines[max(0, idx - 3):min(len(lines), next_idx + 4)])
+                        if "# Rationale:" not in surrounding and "# Workaround:" not in surrounding:
+                            violations.append(
+                                f"{f}: Lines '{line.strip()}' -> '{next_line.strip()}' silently swallow exception without '# Rationale: <reason>'."
+                            )
+
+    if violations:
+        return False, (
+            "[ERROR] Violation: Fix-by-swallowing detected in staged source code:\n  "
+            + "\n  ".join(violations)
+            + "\n  -> Address the root cause or document explicit business reason: '# Rationale: <reason>'."
+        )
+
+    return True, "No silent exception swallowing detected."
+
 
 
 def check_debug_tags(auto_fix: bool = False) -> Tuple[bool, str]:
@@ -166,6 +226,11 @@ def verify_all(auto_fix: bool = False, strict_docstrings: bool = False) -> bool:
     debug_ok, debug_msg = check_debug_tags(auto_fix=auto_fix)
     if not debug_ok:
         print(debug_msg, file=sys.stderr)
+        return False
+
+    swallow_ok, swallow_msg = check_anti_swallowing()
+    if not swallow_ok:
+        print(swallow_msg, file=sys.stderr)
         return False
 
     claims_ok, claims_msg = check_unverified_claims(strict=strict_docstrings)

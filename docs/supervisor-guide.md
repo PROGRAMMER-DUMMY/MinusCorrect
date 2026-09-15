@@ -153,3 +153,18 @@ minuscorrect reset --session-id issue-402
 # Direct runner entry point
 mc-supervisor --session-id issue-402 --timeout 60 -- pytest tests/golden/test_issue_402.py
 ```
+
+---
+
+## 7. Local Golden Immutability & Anti-Swallowing Gates
+
+MinusCorrect enforces systemic integrity before code ever reaches remote GitHub PR checks:
+
+### Local Golden Immutability Guard
+Before executing any test step, `minuscorrect run` inspects `git status --porcelain`. If any file in `tests/golden/` has been modified, added, or deleted without the explicit break-glass token `ALLOW_GOLDEN_EDIT=1`, the supervisor immediately halts execution with status `TAMPERING_DETECTED` (exit code 3). This prevents local agents from modifying acceptance criteria during iterative solver runs.
+
+### Anti-Swallowing Semantic Check
+In `minuscorrect verify`, staged source code changes are analyzed to detect the "fix-by-swallowing" anti-pattern:
+- Blanket `except: pass` or `except Exception: return None` blocks are rejected unless explicitly documented with a business rationale tag (`# Rationale: <reason>`).
+- Forces agents to solve underlying boundary logic rather than masking symptoms behind silent exception suppression.
+
