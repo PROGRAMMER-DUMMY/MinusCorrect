@@ -27,35 +27,35 @@ When autonomous coding agents work in real-world codebases, they suffer from wel
 `MinusCorrect` implements a **hybrid verification boundary** developed through LLM Council peer reviews:
 
 ```
-                      ┌────────────────────────────────────────┐
-                      │        Universal Spec ("The Brain")    │
-                      │  .agent-rules/systemic-integrity.md     │
-                      └───────────────────┬────────────────────┘
-                                          │ referenced by 1-line pointers
-          ┌───────────────────────────────┴──────────────────────────────┐
-          ▼                                                              ▼
+                      +----------------------------------------+
+                      |        Universal Spec ("The Brain")    |
+                      |  .agent-rules/systemic-integrity.md    |
+                      +-------------------+--------------------+
+                                          | referenced by 1-line pointers
+          +-------------------------------+------------------------------+
+          v                                                              v
      [AGENTS.md]                                               [.cursorrules / .codex]
 (Universal Agent Standard)                                         (IDE Bootstraps)
-          │                                                              │
-          └───────────────────────────────┬──────────────────────────────┘
-                                          ▼
-                      ┌────────────────────────────────────────┐
-                      │    The Verification Boundary Model     │
-                      ├────────────────────────────────────────┤
-                      │ • tests/golden/  ──> READ-ONLY to agent│
-                      │ • tests/unit/    ──> Open for new tests│
-                      │ • src/           ──> Target actuator   │
-                      │ • Max 4 runs     ──> Hard abort triage │
-                      └───────────────────┬────────────────────┘
-                                          │
-                                          ▼
-                      ┌────────────────────────────────────────┐
-                      │        CI & Pre-Commit Hard Gate       │
-                      │  - scripts/verify_integrity.py         │
-                      │  - .semgrep/unverified-claims.yml      │
-                      │  - Block modified tests/golden/        │
-                      │  - Block committed [DEBUG] trace logs  │
-                      └────────────────────────────────────────┘
+          |                                                              |
+          +-------------------------------+------------------------------+
+                                          v
+                      +----------------------------------------+
+                      |    The Verification Boundary Model     |
+                      +----------------------------------------+
+                      | * tests/golden/  --> READ-ONLY to agent|
+                      | * tests/unit/    --> Open for new tests|
+                      | * src/           --> Target actuator   |
+                      | * Max 4 runs     --> Hard abort triage |
+                      +-------------------+--------------------+
+                                          |
+                                          v
+                      +----------------------------------------+
+                      |        CI & Pre-Commit Hard Gate       |
+                      |  - minuscorrect verify / verify_integrity|
+                      |  - .semgrep/unverified-claims.yml      |
+                      |  - Block modified tests/golden/        |
+                      |  - Block committed [DEBUG] trace logs  |
+                      +----------------------------------------+
 ```
 
 ---
@@ -87,24 +87,38 @@ When autonomous coding agents work in real-world codebases, they suffer from wel
 
 ## Quickstart & Low-Overhead Usage
 
-MinusCorrect is designed to **minimize human developer hours**. It automates cleanup, prevents broken git states on agent failure, and eliminates repetitive administrative tasks.
+MinusCorrect is packaged as a standard Python distribution (`minuscorrect`) designed to **minimize human developer hours**.
 
-### 1. Zero-Friction Integrity Check & Auto-Remediation
+### 1. Installation
+```bash
+pip install minuscorrect
+# Or install in editable mode from source:
+pip install -e .
+```
+
+### 2. Zero-Friction Integrity Check & Auto-Remediation
 Run the built-in verifier. Add `--fix` to automatically strip leftover `[DEBUG]` traces and re-stage files without manual editing:
 ```bash
-python scripts/verify_integrity.py --fix
+minuscorrect verify --fix
 ```
 
-### 2. Autonomous Agent Execution Supervisor
-To prevent runaway loops from polluting your working tree, use the out-of-process supervisor. If an agent exceeds 4 iterations, it executes an **atomic rollback** to keep your branch pristine and writes a human-ready `DIAGNOSTIC-REPORT.md`:
+### 3. Autonomous Agent Execution Supervisor
+To prevent runaway loops from polluting your working tree, execute test iterations under the supervisor. If an agent exceeds 4 iterations, it executes an **atomic git-tree rollback** to keep your branch pristine and writes a human-ready `DIAGNOSTIC-REPORT.md`:
 ```bash
-python scripts/supervisor.py check --target src/cache.py --test-cmd "pytest tests/golden/test_cache.py" --iteration 1
+# Run supervised cycle on a golden contract test
+minuscorrect run --session-id issue-402 -- pytest tests/golden/test_issue_402.py
+
+# Check current supervisor session status
+minuscorrect status --session-id issue-402
+
+# Reset session after completing work
+minuscorrect reset --session-id issue-402
 ```
 
-### 3. Active Git Pre-Commit Hook & Host-Level Protection
+### 4. Active Git Pre-Commit Hook & Host-Level Protection
 * **Local Pre-Commit Hook:** Active at `.git/hooks/pre-commit`. Runs automatically on every `git commit`.
 * **Git Host CODEOWNERS:** Hard-locked via `.github/CODEOWNERS`. Unauthorized agent shell commits cannot modify `tests/golden/`.
-* **Standard Pre-Commit Package:** Any project can adopt MinusCorrect in 60 seconds by adding it to `.pre-commit-config.yaml`:
+* **Standard Pre-Commit Package:** Any external project can adopt MinusCorrect in 60 seconds by adding it to `.pre-commit-config.yaml`:
   ```yaml
   repos:
     - repo: https://github.com/PROGRAMMER-DUMMY/MinusCorrect
@@ -118,7 +132,7 @@ python scripts/supervisor.py check --target src/cache.py --test-cmd "pytest test
 ALLOW_GOLDEN_EDIT=1 git commit -m "chore: update golden contract"
 ```
 
-### 4. Prompting Agents (Claude Code, Agy, Codex, Cursor)
+### 5. Prompting Agents (Claude Code, Agy, Codex, Cursor)
 When dispatching an autonomous agent:
 > *"Implement the solution to pass `tests/golden/test_billing.py`. Note: `tests/golden/` is STRICTLY READ-ONLY. Mutate only `src/billing.py`. Adhere to `AGENTS.md`."*
 
@@ -159,7 +173,7 @@ To understand how MinusCorrect operates in daily development, consider how it ha
 * **The Execution:**
   1. The team consolidated all operational rules into `AGENTS.md` and `.agent-rules/systemic-integrity.md`.
   2. Native tool bootstraps were reduced to clean one-line references pointing to the canonical standard.
-  3. Local pre-commit hooks and GitHub Actions CI were configured to run `scripts/verify_integrity.py` on every staged diff regardless of which tool authored the change.
+  3. Local pre-commit hooks and GitHub Actions CI were configured to run `minuscorrect verify` on every staged diff regardless of which tool authored the change.
 * **The Result:** Context drift across tools was eliminated. PR review cycles shortened by 60%, and 100% of pull requests automatically respected golden regression contracts before reaching human review.
 
 ---
@@ -180,32 +194,42 @@ MinusCorrect enforces this exact discipline on autonomous AI systems. It transfo
 ## Repository Structure
 
 ```
-├── .agent-rules/
-│   └── systemic-integrity.md         # Canonical core specification
-├── .github/
-│   ├── CODEOWNERS                    # Hard-lock golden contracts at the Git host level
-│   └── workflows/
-│       └── integrity.yml             # Out-of-band CI verification
-├── .pre-commit-hooks.yaml            # Standard pre-commit hook definition for external repos
-├── .semgrep/
-│   └── unverified-claims.yml         # Semgrep rule for docstring superlatives
-├── docs/                             # Modular documentation suite
-│   ├── README.md                     # Documentation hub and index
-│   ├── quickstart.md                 # Setup and daily workflows
-│   ├── golden-contracts.md           # Specification authoring & boundary enforcement
-│   ├── supervisor-guide.md           # Process supervision & atomic rollback
-│   ├── docstring-standard.md         # Two-Category docstring auditing
-│   ├── agent-matrix.md               # Claude Code, AGY, Codex, Cursor integration
-│   └── ci-governance.md              # Git host security & threat mitigation
-├── scripts/
-│   ├── supervisor.py                 # Out-of-process agent supervisor with atomic rollback
-│   └── verify_integrity.py           # Cross-platform integrity verifier with --fix support
-├── tests/
-│   ├── golden/README.md              # Immutable acceptance contracts
-│   └── unit/README.md                # Mutable developer unit tests
-├── AGENTS.md                         # Universal agent standard (Claude Code, AGY, Codex, Cursor)
-├── .codex/instructions.md            # Native bootstrap for Codex Agent
-└── .cursorrules                      # Native bootstrap for Cursor
++-- .agent-rules/
+|   +-- systemic-integrity.md         # Canonical core specification
++-- .github/
+|   +-- CODEOWNERS                    # Hard-lock golden contracts at the Git host level
+|   +-- workflows/
+|       +-- integrity.yml             # Out-of-band CI verification
++-- .pre-commit-hooks.yaml            # Standard pre-commit hook definition for external repos
++-- .semgrep/
+|   +-- unverified-claims.yml         # Semgrep rule for docstring superlatives
++-- docs/                             # Modular documentation suite
+|   +-- README.md                     # Documentation hub and index
+|   +-- quickstart.md                 # Setup and daily workflows
+|   +-- golden-contracts.md           # Specification authoring & boundary enforcement
+|   +-- supervisor-guide.md           # Process supervision & atomic rollback
+|   +-- docstring-standard.md         # Two-Category docstring auditing
+|   +-- agent-matrix.md               # Claude Code, AGY, Codex, Cursor integration
+|   +-- ci-governance.md              # Git host security & threat mitigation
++-- doc/                              # Documentation navigation hub
+|   +-- README.md                     # Symlinked navigation hub
++-- minuscorrect/                     # Turnkey Python package
+|   +-- __init__.py                   # Package exports
+|   +-- cli.py                        # Unified CLI (run, verify, status, reset)
+|   +-- supervisor.py                 # Out-of-process supervisor & session state
+|   +-- verifier.py                   # Integrity verifier & auto-fixer engine
++-- pyproject.toml                    # Standard Python package specification & entry points
++-- scripts/
+|   +-- supervisor.py                 # Supervisor CLI wrapper
+|   +-- verify_integrity.py           # Integrity verifier CLI wrapper
++-- tests/
+|   +-- golden/README.md              # Immutable acceptance contracts
+|   +-- unit/
+|       +-- README.md                 # Mutable developer unit tests
+|       +-- test_supervisor.py        # Supervisor unit test suite
++-- AGENTS.md                         # Universal agent standard (Claude Code, AGY, Codex, Cursor)
++-- .codex/instructions.md            # Native bootstrap for Codex Agent
++-- .cursorrules                      # Native bootstrap for Cursor
 ```
 
 ---

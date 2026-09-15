@@ -1,6 +1,6 @@
 # Autonomous Supervisor & Circuit Breaker Guide
 
-This document details the mechanics, state transitions, and operational benefits of the **MinusCorrect Autonomous Supervisor** (`scripts/supervisor.py`).
+This document details the mechanics, state transitions, and operational guarantees of the **MinusCorrect Autonomous Supervisor** (`minuscorrect.supervisor` / `minuscorrect run`).
 
 ---
 
@@ -11,7 +11,7 @@ Prompt-based constraints ("stop after 4 retries") fail in production because:
 2. Under token pressure, agents panic and attempt ungrounded brute-force modifications.
 3. When an in-band agent aborts, it leaves the local working tree corrupted with broken syntax, dirty diffs, and leftover debug print statements.
 
-MinusCorrect moves circuit breaking **out-of-process** into `scripts/supervisor.py`. The supervisor executes external commands, monitors exit codes, computes error hashes, and enforces process termination.
+MinusCorrect moves circuit breaking **out-of-process** into `minuscorrect.supervisor` (accessible via `minuscorrect run` and `mc-supervisor`). The supervisor executes external test commands, normalizes failure streams, computes deterministic error hashes, persists execution state to disk, and enforces strict process termination.
 
 ---
 
@@ -19,61 +19,129 @@ MinusCorrect moves circuit breaking **out-of-process** into `scripts/supervisor.
 
 ```
 [Agent Initiates Solver Cycle]
-               │
-               ▼
-   Take Clean Snapshot of Target
-               │
-               ▼
-       Execute Test Harness
-               │
+               |
+               v
+   Capture Git Tree State Snapshot
+               |
+               v
+       Execute Test Harness (e.g. pytest tests/golden/)
+               |
        +-------+-------+
-       │               │
+       |               |
     (Pass)          (Fail)
-       │               │
-       ▼               ▼
-Auto-Clean Debug   Compute SHA-256 Error Hash
-(verify_integrity)     │
-       │         +-----+-----+-----+
-       ▼         │           │     │
+       |               |
+       v               v
+Auto-Clean Debug   Sanitize Trace & Compute SHA-256 Hash
+(verify_integrity)     |
+       |         +-----+-----+-----+
+       v         |           |     |
      COMMIT   (Iter 1-2)  (Iter 3) (Iter 4)
-                 │           │     │
-              Repeat?     Repeat?  │
-                 │        [DEBUG]  ▼
-                 ▼        Inject  [ HARD ABORT ]
-              Continue       │    1. Atomic Rollback
-                 │           ▼    2. Generate DIAGNOSTIC-REPORT.md
+                 |           |     |
+              Repeat?     Repeat?  |
+                 |        [DEBUG]  v
+                 v        Inject  [ HARD ABORT ]
+              Continue       |    1. Git-Tree Atomic Rollback
+                 |           v    2. Generate DIAGNOSTIC-REPORT.md
                  +-------> Retest 3. Alert Human Maintainer
 ```
 
 ---
 
-## 3. Normalized Error Hashing
+## 3. Persistent Multi-Session State
 
-To detect whether an agent is making algorithmic progress or spinning on the same root defect, the supervisor captures and normalizes `stderr` and `stdout`:
+To maintain loop counters across independent CLI calls, the supervisor serializes session history to `.minuscorrect/sessions/<session_id>.json`:
 
-```python
-def compute_error_hash(stderr: str, stdout: str) -> str:
-    normalized = f"{stderr.strip()}\n{stdout.strip()}".strip()
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+```json
+{
+  "session_id": "default",
+  "created_at": "2026-09-14T19:11:37.464271+00:00",
+  "updated_at": "2026-09-14T19:11:39.123456+00:00",
+  "status": "ACTIVE",
+  "current_iteration": 2,
+  "max_iterations": 4,
+  "history": [
+    {
+      "iteration": 1,
+      "exit_code": 1,
+      "hash": "a31e555fb0de1000",
+      "command": ["pytest", "tests/golden/test_issue.py"]
+    }
+  ]
+}
 ```
 
-- If two consecutive iterations yield the **identical error hash**, the supervisor recognizes that the agent's mental model is flawed.
-- On iteration 3, the supervisor mandates **epistemic debug injection** (`[DEBUG]` print statements) so the agent can observe runtime values rather than guessing.
+### Session Lifecycle States
+- **`ACTIVE`**: The agent is within the 1-4 iteration budget and actively attempting algorithmic solutions.
+- **`SCAFFOLDING_REQUIRED`**: Repeated identical error signatures detected at iteration 3. The supervisor prompts for `[DEBUG]` logging injection.
+- **`HARD_ABORT`**: The agent reached the 4-iteration ceiling without passing. The supervisor executes an atomic rollback and halts execution.
+- **`CONVERGED`**: Test harness passed with exit code 0. Residual debug logs are automatically sanitized.
 
 ---
 
-## 4. Transactional Rollback: Zero Cleanup Time for Humans
+## 4. Volatile-Token Sanitization & Deterministic Error Hashing
 
-When iteration 4 fails, the circuit breaker trips. Rather than leaving the human engineer with a broken workspace, the supervisor executes an **atomic rollback**:
+Raw stderr and stdout frequently contain timing jitter, memory addresses, and process IDs. If hashed directly, every run produces a different hash, blinding loop detection.
 
-1. Restores the target implementation file from the initial pre-session snapshot.
-2. Purges any untracked or partially modified files.
+The supervisor's `sanitize_trace()` function removes non-deterministic tokens before hashing:
+
+```python
+def sanitize_trace(raw_trace: str) -> str:
+    cleaned = raw_trace
+    # Strip memory pointers: 0x7fff5fbff8b0 -> 0xADDR
+    cleaned = re.sub(r"0x[0-9a-fA-F]+", "0xADDR", cleaned)
+    # Strip test execution durations: 0.04s, 12ms -> <DURATION>
+    cleaned = re.sub(r"\b\d+(\.\d+)?(s|ms)\b", "<DURATION>", cleaned)
+    # Strip ISO timestamps: 2026-09-14T18:00:00Z -> <TIMESTAMP>
+    cleaned = re.sub(r"\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?", "<TIMESTAMP>", cleaned)
+    # Strip PID markers
+    cleaned = re.sub(r"\bpid\s*=\s*\d+\b", "pid=<PID>", cleaned, flags=re.IGNORECASE)
+    return cleaned
+```
+
+The normalized trace is hashed with SHA-256 (truncated to 16 hex characters):
+- If consecutive iterations yield the **identical error hash**, the supervisor recognizes that the agent's mental model is flawed.
+- On iteration 3, the supervisor mandates **epistemic debug injection** (`[DEBUG]` print statements) so the agent observes runtime values rather than guessing.
+
+---
+
+## 5. Git-Tree Atomic Rollback
+
+When iteration 4 fails, the circuit breaker trips. Rather than leaving the human engineer with a broken workspace, the supervisor executes an **atomic git-tree rollback**:
+
+```bash
+git checkout -- .
+git clean -fd
+```
+
+1. Reverts all modified tracked files across the repository to the pre-session state.
+2. Deletes any untracked or partially authored scratch files.
 3. Automatically writes `DIAGNOSTIC-REPORT.md` to the workspace root.
 
 ### Structure of `DIAGNOSTIC-REPORT.md`
 The generated report contains:
 - **Failure Signature:** Normalized SHA-256 error hash and iteration count.
 - **Last Stderr & Stdout:** The exact compiler or test runner failure trace.
+- **Reproduction Command:** The exact test command executed.
 - **Escalation Guidance:** The specific invariant that failed and options for human intervention.
 
 This reduces human intervention from 30–60 minutes of tedious git archaeology to **2 minutes of targeted root-cause review**.
+
+---
+
+## 6. CLI Command Reference
+
+MinusCorrect provides a unified CLI for supervisor operations:
+
+```bash
+# Run a test under supervisor control
+minuscorrect run --session-id issue-402 -- pytest tests/golden/test_issue_402.py
+
+# Inspect active supervisor session status
+minuscorrect status --session-id issue-402
+
+# Reset an existing session
+minuscorrect reset --session-id issue-402
+
+# Direct runner entry point
+mc-supervisor --session-id issue-402 -- pytest tests/golden/test_issue_402.py
+```

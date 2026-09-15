@@ -7,7 +7,7 @@ name = "minuscorrect"
 version = "0.2.0"
 description = "Systemic Integrity & Closed-Loop Verification Protocol for Autonomous Coding Agents"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.9"
 authors = [
     { name = "Shubham Veer" }
@@ -26,7 +26,6 @@ keywords = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
