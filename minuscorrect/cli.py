@@ -49,6 +49,17 @@ def build_parser() -> argparse.ArgumentParser:
     incident_parser.add_argument("--promote", action="store_true", help="Promote directly to tests/golden/ (requires ALLOW_GOLDEN_EDIT=1)")
     incident_parser.add_argument("--output-dir", default="tests/staging", help="Output directory for staged test (default: tests/staging)")
 
+    # Command: patch
+    patch_parser = subparsers.add_parser("patch", help="Validate write blast-radius and atomically apply agent diff")
+    patch_parser.add_argument("diff_file", nargs="?", default="-", help="Path to unified diff patch file, or '-' for stdin")
+    patch_parser.add_argument("--allowed-target", action="append", dest="allowed_targets", help="Whitelisted target files that may be modified")
+    patch_parser.add_argument("--check-only", action="store_true", help="Perform dry-run blast radius check without applying")
+
+    # Command: audit
+    audit_parser = subparsers.add_parser("audit", help="Ingest findings.json from cloudflare/security-audit-skill")
+    audit_parser.add_argument("findings_file", nargs="?", default="findings.json", help="Path to findings.json (default: findings.json)")
+    audit_parser.add_argument("--output-dir", default="tests/staging", help="Output directory for staged contracts (default: tests/staging)")
+
     return parser
 
 
@@ -154,6 +165,77 @@ def handle_incident(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_patch(args: argparse.Namespace) -> int:
+    from minuscorrect.patch import apply_patch_atomically, validate_patch_blast_radius
+
+    if args.diff_file == "-" or not args.diff_file:
+        if sys.stdin.isatty():
+            print("[INFO] Paste unified diff patch (press Ctrl+D or Ctrl+Z when done):", file=sys.stderr)
+        diff_text = sys.stdin.read()
+    else:
+        patch_path = Path(args.diff_file)
+        if not patch_path.exists():
+            print(f"[ERROR] Patch file not found: {patch_path}", file=sys.stderr)
+            return 1
+        diff_text = patch_path.read_text(encoding="utf-8", errors="replace")
+
+    if not diff_text.strip():
+        print("[ERROR] Empty diff received.", file=sys.stderr)
+        return 1
+
+    valid, targets, msg = validate_patch_blast_radius(
+        diff_text=diff_text,
+        allowed_targets=args.allowed_targets
+    )
+
+    if not valid:
+        print(msg, file=sys.stderr)
+        return 1
+
+    print(f"[SUCCESS] Blast-radius check PASSED. Touched targets: {', '.join(targets)}")
+
+    if args.check_only:
+        print("[INFO] Dry-run check requested. Patch was NOT applied to working tree.")
+        return 0
+
+    applied, apply_msg = apply_patch_atomically(diff_text=diff_text)
+    if not applied:
+        print(apply_msg, file=sys.stderr)
+        return 1
+
+    print(f"[SUCCESS] {apply_msg}")
+    return 0
+
+
+def handle_audit(args: argparse.Namespace) -> int:
+    from minuscorrect.audit import (
+        generate_security_audit_summary,
+        generate_staged_security_test,
+        parse_audit_findings,
+    )
+
+    audit_file = Path(args.findings_file)
+    if not audit_file.exists():
+        print(f"[ERROR] Audit findings file not found: {audit_file}", file=sys.stderr)
+        return 1
+
+    raw_json = audit_file.read_text(encoding="utf-8", errors="replace")
+    confirmed, needs_val, rejected = parse_audit_findings(raw_json)
+
+    print(f"[INFO] Ingested {len(confirmed)} confirmed, {len(needs_val)} unvalidated, {len(rejected)} rejected findings.")
+
+    staged_tests = []
+    for finding in confirmed:
+        test_path = generate_staged_security_test(finding, output_dir=Path(args.output_dir))
+        staged_tests.append(test_path)
+        print(f"[SUCCESS] Staged security reproduction contract: {test_path.resolve()}")
+
+    summary_path = generate_security_audit_summary(confirmed, needs_val, rejected)
+    print(f"[SUCCESS] Audit summary generated: {summary_path.resolve()}")
+
+    return 0
+
+
 def main(argv: List[str] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -168,6 +250,10 @@ def main(argv: List[str] = None) -> int:
         return handle_reset(args)
     elif args.command == "incident":
         return handle_incident(args)
+    elif args.command == "patch":
+        return handle_patch(args)
+    elif args.command == "audit":
+        return handle_audit(args)
     else:
         parser.print_help()
         return 0

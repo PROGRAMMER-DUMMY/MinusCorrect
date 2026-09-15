@@ -122,3 +122,36 @@ cat crash.json | python scripts/incident_to_golden.py --id INC-1042
    ```bash
    ALLOW_GOLDEN_EDIT=1 git mv tests/staging/test_incident_inc_1042.py tests/golden/
    ```
+
+---
+
+## 6. Cloudflare Security Audit Bridge (`minuscorrect audit`)
+
+Ingest adversarially confirmed vulnerabilities from `cloudflare/security-audit-skill`:
+
+```bash
+# Parse findings.json, quarantine unvalidated findings, and scaffold confirmed exploits
+minuscorrect audit findings.json --output-dir tests/staging
+```
+
+- Confirmed exploits generate reproduction contracts in `tests/staging/test_sec_<id>.py`.
+- Generates `SECURITY-AUDIT-SUMMARY.md` tracking confirmed vs rejected candidates.
+- Unvalidated or rejected findings are quarantined to prevent test suite poisoning.
+
+---
+
+## 7. Blast-Radius Patch Validator (`minuscorrect patch`)
+
+Validate agent-proposed unified diffs against zero-trust write boundaries:
+
+```bash
+# Validate and apply patch with blast radius restrictions
+minuscorrect patch fix.diff --allowed-target src/parser.py
+
+# Perform dry-run blast radius verification without modifying disk
+minuscorrect patch fix.diff --check-only --allowed-target src/parser.py
+```
+
+- Strictly blocks path traversal (`..`).
+- Blocks import-time execution hazards: modifications to `conftest.py`, `.github/`, `setup.py`, and `pyproject.toml`.
+- Blocks modifications to `tests/golden/` without `ALLOW_GOLDEN_EDIT=1`.
