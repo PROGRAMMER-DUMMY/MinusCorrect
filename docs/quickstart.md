@@ -224,3 +224,46 @@ docker build -t minuscorrect:latest .
 # Run supervisor inside container mounting the target workspace
 docker run --rm -v $(pwd):/workspace minuscorrect:latest run -- pytest tests/golden/
 ```
+
+---
+
+## 12. Model Context Protocol (MCP) Server
+
+Expose MinusCorrect's execution containment and verification tools natively to any MCP-compatible coding agent (Claude Code, Cursor, Google Antigravity, Cline, Windsurf) over standard JSON-RPC:
+
+```bash
+# Launch MCP server over stdio
+minuscorrect mcp
+
+# Or via dedicated binary
+mc-mcp
+```
+
+### Supported MCP Tools:
+- `minuscorrect_run`: Execute tests under the 4-iteration circuit breaker with rollback.
+- `minuscorrect_verify`: Verify golden test protection, anti-swallowing AST rules, and debug tag cleanup.
+- `minuscorrect_validate_patch`: Validate a unified diff against write blast-radius rules (blocks `conftest.py`, `pyproject.toml`, path traversal).
+- `minuscorrect_ingest_incident`: Redact secrets/PII, defang injections, and synthesize staged reproduction contracts from crash JSON.
+- `minuscorrect_create_draft_pr`: Generate a decoupled Draft PR proposal (`DRAFT-PR-<id>.md`).
+- `minuscorrect_status`: Inspect session history and iteration count.
+
+### Client Configuration (`claude_desktop_config.json` or `.gemini/settings.json`):
+```json
+{
+  "mcpServers": {
+    "minuscorrect": {
+      "command": "minuscorrect",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+---
+
+## 13. Agent Skills Library (`skills/`)
+
+MinusCorrect bundles standalone, declarative skill specifications for agent pre-execution reasoning:
+
+- **`skills/minuscorrect-council/SKILL.md`**: Multi-perspective deliberation protocol (Contrarian, First Principles, Expansionist, Outsider, Executor) to stress-test high-risk bug fixes and architectural decisions before burning iteration budgets.
+- **`skills/minuscorrect-security/SKILL.md`**: Fused 10-domain security checklist (secrets, input validation, SQLi, XSS, CSRF, auth/RLS, sensitive logging, crypto, dependencies) with adversarial PoC contract synthesis for closed-loop remediation.

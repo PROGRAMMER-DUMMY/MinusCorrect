@@ -146,3 +146,7 @@ def apply_patch_atomically(
         return False, f"[ERROR] 'git apply' failed:\n{err}"
 
     return True, "Patch successfully applied."
+
+
+# Alias for concise import
+validate_patch = validate_patch_blast_radius

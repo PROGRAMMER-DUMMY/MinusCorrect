@@ -43,6 +43,7 @@ Issues = "https://github.com/PROGRAMMER-DUMMY/MinusCorrect/issues"
 [project.scripts]
 minuscorrect = "minuscorrect.cli:main"
 mc-supervisor = "minuscorrect.cli:supervisor_main"
+mc-mcp = "minuscorrect.cli:mcp_main"
 
 [tool.setuptools.packages.find]
 where = ["."]

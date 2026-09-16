@@ -4,6 +4,7 @@ MinusCorrect: Systemic Integrity & Closed-Loop Verification Protocol
 
 __version__ = "1.0.0"
 
+from minuscorrect.mcp import run_mcp_server
 from minuscorrect.notify import NotificationEvent, dispatch_notification
 from minuscorrect.pr import DraftPRMetadata, create_draft_pr_artifact, generate_draft_pr_markdown
 from minuscorrect.supervisor import AgentSupervisor, compute_error_hash, sanitize_trace
@@ -19,6 +20,7 @@ __all__ = [
     "create_draft_pr_artifact",
     "dispatch_notification",
     "generate_draft_pr_markdown",
+    "run_mcp_server",
     "sanitize_trace",
     "verify_all",
     "__version__",

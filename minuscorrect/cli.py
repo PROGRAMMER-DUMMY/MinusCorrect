@@ -70,6 +70,9 @@ def build_parser() -> argparse.ArgumentParser:
     pr_parser.add_argument("--output-file", help="Path to output markdown file (default: DRAFT-PR-<session-id>.md)")
     pr_parser.add_argument("--commit-and-branch", action="store_true", help="Create isolated git branch and commit modified files")
 
+    # Command: mcp
+    subparsers.add_parser("mcp", help="Launch Model Context Protocol (MCP) JSON-RPC 2.0 stdio server")
+
     return parser
 
 
@@ -304,9 +307,24 @@ def main(argv: List[str] = None) -> int:
         return handle_audit(args)
     elif args.command == "pr":
         return handle_pr(args)
+    elif args.command == "mcp":
+        return handle_mcp(args)
     else:
         parser.print_help()
         return 0
+
+
+def handle_mcp(args: argparse.Namespace) -> int:
+    from minuscorrect.mcp import run_mcp_server
+    run_mcp_server()
+    return 0
+
+
+def mcp_main() -> int:
+    """Entry point for mc-mcp console script."""
+    from minuscorrect.mcp import run_mcp_server
+    run_mcp_server()
+    return 0
 
 
 def supervisor_main() -> int:
