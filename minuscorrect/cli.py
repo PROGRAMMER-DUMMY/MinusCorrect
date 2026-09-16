@@ -26,6 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--session-id", default="default", help="Session ID for state persistence")
     run_parser.add_argument("--max-iterations", type=int, default=4, help="Maximum solver iterations before hard abort")
     run_parser.add_argument("--timeout", type=float, default=120.0, help="Execution timeout in seconds (default: 120.0)")
+    run_parser.add_argument("--webhook-url", help="Webhook endpoint for operational alert notifications")
+    run_parser.add_argument("--worktree", action="store_true", help="Execute test run inside an isolated ephemeral git worktree")
     run_parser.add_argument("--reset", action="store_true", help="Reset session before execution")
     run_parser.add_argument("test_cmd", nargs=argparse.REMAINDER, help="Test command to execute (e.g. pytest tests/golden/)")
 
@@ -60,6 +62,14 @@ def build_parser() -> argparse.ArgumentParser:
     audit_parser.add_argument("findings_file", nargs="?", default="findings.json", help="Path to findings.json (default: findings.json)")
     audit_parser.add_argument("--output-dir", default="tests/staging", help="Output directory for staged contracts (default: tests/staging)")
 
+    # Command: pr
+    pr_parser = subparsers.add_parser("pr", help="Generate Draft PR proposal and decouple autonomous fixes from main")
+    pr_parser.add_argument("--session-id", default="default", help="Session ID to export (default: default)")
+    pr_parser.add_argument("--branch", dest="branch_name", help="Target branch name (default: minuscorrect/patch-<session-id>)")
+    pr_parser.add_argument("--summary", default="Automated defect repair via MinusCorrect supervisor", help="Summary of changes")
+    pr_parser.add_argument("--output-file", help="Path to output markdown file (default: DRAFT-PR-<session-id>.md)")
+    pr_parser.add_argument("--commit-and-branch", action="store_true", help="Create isolated git branch and commit modified files")
+
     return parser
 
 
@@ -75,18 +85,38 @@ def handle_run(args: argparse.Namespace) -> int:
 
     target_path = Path(args.target) if args.target else None
     timeout_val = getattr(args, "timeout", 120.0)
-    supervisor = AgentSupervisor(
-        session_id=args.session_id,
-        max_iterations=args.max_iterations,
-        target_file=target_path,
-        timeout=timeout_val
-    )
+    webhook_url = getattr(args, "webhook_url", None)
+    use_worktree = getattr(args, "worktree", False)
 
-    if args.reset:
-        supervisor.state.reset()
-        print(f"[SUPERVISOR] Reset session '{args.session_id}'.")
+    if use_worktree:
+        from minuscorrect.worktree import EphemeralWorktree
+        with EphemeralWorktree() as wt_path:
+            print(f"[SUPERVISOR] Executing within isolated ephemeral worktree: {wt_path}")
+            supervisor = AgentSupervisor(
+                session_id=args.session_id,
+                max_iterations=args.max_iterations,
+                target_file=target_path,
+                timeout=timeout_val,
+                webhook_url=webhook_url,
+                cwd=wt_path,
+            )
+            if args.reset:
+                supervisor.state.reset()
+                print(f"[SUPERVISOR] Reset session '{args.session_id}'.")
+            result = supervisor.run_step(test_cmd=cmd)
+    else:
+        supervisor = AgentSupervisor(
+            session_id=args.session_id,
+            max_iterations=args.max_iterations,
+            target_file=target_path,
+            timeout=timeout_val,
+            webhook_url=webhook_url,
+        )
+        if args.reset:
+            supervisor.state.reset()
+            print(f"[SUPERVISOR] Reset session '{args.session_id}'.")
+        result = supervisor.run_step(test_cmd=cmd)
 
-    result = supervisor.run_step(test_cmd=cmd)
     if result["status"] == "SUCCESS":
         return 0
     elif result["status"] == "HARD_ABORT":
@@ -94,6 +124,24 @@ def handle_run(args: argparse.Namespace) -> int:
     elif result["status"] == "TAMPERING_DETECTED":
         return 3
     else:
+        return 1
+
+
+def handle_pr(args: argparse.Namespace) -> int:
+    from minuscorrect.pr import create_draft_pr_artifact
+    out_file = Path(args.output_file) if args.output_file else None
+    try:
+        pr_artifact = create_draft_pr_artifact(
+            session_id=args.session_id,
+            branch_name=args.branch_name,
+            summary=args.summary,
+            output_file=out_file,
+            commit_and_branch=args.commit_and_branch,
+        )
+        print(f"[SUCCESS] Draft PR proposal artifact generated: {pr_artifact.resolve()}")
+        return 0
+    except Exception as exc:
+        print(f"[ERROR] Failed to generate Draft PR artifact: {exc}", file=sys.stderr)
         return 1
 
 
@@ -254,6 +302,8 @@ def main(argv: List[str] = None) -> int:
         return handle_patch(args)
     elif args.command == "audit":
         return handle_audit(args)
+    elif args.command == "pr":
+        return handle_pr(args)
     else:
         parser.print_help()
         return 0

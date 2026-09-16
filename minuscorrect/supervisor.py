@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from minuscorrect.notify import NotificationEvent, dispatch_notification
+
 
 def sanitize_trace(raw: str) -> str:
     """
@@ -129,12 +131,16 @@ class AgentSupervisor:
         session_id: str = "default",
         max_iterations: int = 4,
         target_file: Optional[Path] = None,
-        timeout: float = 120.0
+        timeout: float = 120.0,
+        webhook_url: Optional[str] = None,
+        cwd: Optional[Path] = None,
     ):
         self.session_id = session_id
         self.max_iterations = max_iterations
         self.target_file = target_file.resolve() if target_file else None
         self.timeout = timeout
+        self.webhook_url = webhook_url or os.environ.get("MINUSCORRECT_WEBHOOK_URL")
+        self.cwd = Path(cwd).resolve() if cwd else None
         self.state = SessionState.load(session_id)
         self.state.max_iterations = max_iterations
         if self.target_file and str(self.target_file) not in self.state.target_files:
@@ -146,7 +152,7 @@ class AgentSupervisor:
         Discards tracked changes and cleans untracked build artifacts,
         while preserving developer secrets, virtualenvs, and configuration files (.env, .venv, etc.).
         """
-        run_git_command(["checkout", "--", "."])
+        run_git_command(["checkout", "--", "."], cwd=self.cwd)
         run_git_command([
             "clean", "-fd",
             "-e", ".env*",
@@ -154,7 +160,7 @@ class AgentSupervisor:
             "-e", "venv*",
             "-e", "*.local",
             "-e", ".minuscorrect*"
-        ])
+        ], cwd=self.cwd)
         print("[SUPERVISOR] Git-tree atomic rollback completed: Tracked changes reverted and build artifacts cleaned (configuration files preserved).")
 
     def write_diagnostic_report(
@@ -166,7 +172,7 @@ class AgentSupervisor:
         test_cmd: List[str]
     ) -> Path:
         """Generates DIAGNOSTIC-REPORT.md so human maintainers spend 2 minutes reviewing root cause."""
-        report_path = Path("DIAGNOSTIC-REPORT.md")
+        report_path = (self.cwd / "DIAGNOSTIC-REPORT.md") if self.cwd else Path("DIAGNOSTIC-REPORT.md")
         timestamp = datetime.now(timezone.utc).isoformat()
         targets_str = ", ".join(self.state.target_files) if self.state.target_files else "Entire workspace"
 
@@ -236,6 +242,15 @@ class AgentSupervisor:
             print(f"\n[SUPERVISOR TAMPERING DETECTED]\n{golden_msg}")
             self.state.status = "TAMPERING_DETECTED"
             self.state.save()
+            dispatch_notification(
+                NotificationEvent(
+                    event_type="TAMPERING_DETECTED",
+                    session_id=self.session_id,
+                    summary="Unauthorized modification of immutable acceptance contract detected.",
+                    details={"iteration": self.state.current_iteration, "error": golden_msg},
+                ),
+                webhook_url=self.webhook_url,
+            )
             return {
                 "status": "TAMPERING_DETECTED",
                 "error": golden_msg,
@@ -252,6 +267,7 @@ class AgentSupervisor:
         try:
             res = subprocess.run(
                 test_cmd,
+                cwd=str(self.cwd) if self.cwd else None,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -265,6 +281,15 @@ class AgentSupervisor:
             out = exc.stdout or ""
             err = (exc.stderr or "") + f"\n[SUPERVISOR TIMEOUT] Test execution timed out after {effective_timeout}s."
             print(f"[SUPERVISOR] Execution TIMED OUT after {effective_timeout}s.")
+            dispatch_notification(
+                NotificationEvent(
+                    event_type="TIMEOUT_ABORT",
+                    session_id=self.session_id,
+                    summary=f"Execution timed out after {effective_timeout}s.",
+                    details={"iteration": iteration, "timeout": effective_timeout},
+                ),
+                webhook_url=self.webhook_url,
+            )
 
         err_hash = compute_error_hash(err, out)
 
@@ -283,6 +308,16 @@ class AgentSupervisor:
 
             from minuscorrect.verifier import check_debug_tags
             check_debug_tags(auto_fix=True)
+
+            dispatch_notification(
+                NotificationEvent(
+                    event_type="RUN_SUCCESS",
+                    session_id=self.session_id,
+                    summary=f"Test harness PASSED on iteration {iteration}.",
+                    details={"iteration": iteration, "exit_code": 0},
+                ),
+                webhook_url=self.webhook_url,
+            )
 
             return {"status": "SUCCESS", "iteration": iteration}
 
@@ -312,6 +347,16 @@ class AgentSupervisor:
                 last_out=out,
                 error_hash=err_hash,
                 test_cmd=test_cmd
+            )
+            dispatch_notification(
+                NotificationEvent(
+                    event_type="CIRCUIT_BREAKER_ABORT",
+                    session_id=self.session_id,
+                    summary=f"Circuit breaker TRIPPED at iteration {iteration}.",
+                    details={"iteration": iteration, "error_hash": err_hash},
+                    report_path=str(report_file),
+                ),
+                webhook_url=self.webhook_url,
             )
             return {
                 "status": "HARD_ABORT",

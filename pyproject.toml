@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "minuscorrect"
-version = "0.2.0"
+version = "1.0.0"
 description = "Systemic Integrity & Closed-Loop Verification Protocol for Autonomous Coding Agents"
 readme = "README.md"
 license = "MIT"

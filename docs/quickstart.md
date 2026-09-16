@@ -155,3 +155,72 @@ minuscorrect patch fix.diff --check-only --allowed-target src/parser.py
 - Strictly blocks path traversal (`..`).
 - Blocks import-time execution hazards: modifications to `conftest.py`, `.github/`, `setup.py`, and `pyproject.toml`.
 - Blocks modifications to `tests/golden/` without `ALLOW_GOLDEN_EDIT=1`.
+
+---
+
+## 8. Operational Webhook Egress (`--webhook-url`)
+
+Stream real-time operational notifications to Slack, PagerDuty, or Datadog upon supervisor events:
+
+```bash
+# Pass webhook URL via flag
+minuscorrect run --webhook-url "https://hooks.slack.com/services/..." -- pytest tests/staging/test_incident_1042.py
+
+# Or export via environment variable
+export MINUSCORRECT_WEBHOOK_URL="https://alerts.internal.net/events"
+minuscorrect run -- pytest tests/staging/test_incident_1042.py
+```
+
+Dispatched events include:
+- `RUN_SUCCESS`: Test harness passed; patch verified.
+- `CIRCUIT_BREAKER_ABORT`: 4-iteration ceiling reached; atomic rollback executed and diagnostic report written.
+- `TIMEOUT_ABORT`: Execution exceeded timeout threshold.
+- `TAMPERING_DETECTED`: Attempted unauthorized modification of `tests/golden/`.
+
+---
+
+## 9. Ephemeral Git Worktree Isolation (`--worktree`)
+
+Prevent `.git/index.lock` collisions and workspace contamination during parallel agent runs or CI executions:
+
+```bash
+# Execute supervised test run inside an isolated, disposable git worktree
+minuscorrect run --worktree --session-id parallel-worker-1 -- pytest tests/staging/
+```
+
+- Spawns an isolated `git worktree` checkout under `.minuscorrect/worktrees/`.
+- Executes all tests and supervisor steps inside the temporary worktree.
+- Automatically cleans up the worktree and disposable branch upon completion.
+
+---
+
+## 10. Autonomous PR Decoupling (`minuscorrect pr`)
+
+Enforce the core invariant that autonomous agents must never commit directly to production default branches:
+
+```bash
+# Generate a structured Draft Pull Request proposal
+minuscorrect pr --session-id cache-lru --summary "Fix LRU cache eviction key boundary"
+
+# Optionally create an isolated branch and commit verified files
+minuscorrect pr --session-id cache-lru --commit-and-branch
+```
+
+- Generates `DRAFT-PR-<session_id>.md` containing:
+  - Verified test receipts and execution iteration counts.
+  - Blast-radius summary and diff statistics.
+  - Human review checklist and local reproduction instructions.
+
+---
+
+## 11. Hardened Container Execution (Docker)
+
+Deploy MinusCorrect inside a secure, unprivileged container sandbox for CI/CD runners or staging environments:
+
+```bash
+# Build the hardened container image
+docker build -t minuscorrect:latest .
+
+# Run supervisor inside container mounting the target workspace
+docker run --rm -v $(pwd):/workspace minuscorrect:latest run -- pytest tests/golden/
+```
