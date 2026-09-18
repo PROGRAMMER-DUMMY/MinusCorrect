@@ -107,3 +107,41 @@ def test_cli_patch_command_blocks_forbidden(tmp_path):
 
     code = cli_main(["patch", str(patch_file)])
     assert code == 1
+
+
+@pytest.mark.parametrize(
+    "forbidden_path",
+    [
+        "Makefile",
+        "subdir/Makefile",
+        "makefile",
+        "tox.ini",
+        "ci/tox.ini",
+        "noxfile.py",
+        "sub/noxfile.py",
+        "Dockerfile",
+        "docker/Dockerfile.prod",
+        "Containerfile",
+        "deploy/Containerfile.ci",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "deploy/docker-compose.dev.yml",
+        ".gitlab-ci.yml",
+        ".gitlab-ci.yaml",
+        "sub/.gitlab-ci.yml",
+        ".circleci/config.yml",
+        "sub/.circleci/workflow.yml",
+    ],
+)
+def test_validate_patch_blocks_expanded_build_files(forbidden_path):
+    diff = f"""--- a/{forbidden_path}
++++ b/{forbidden_path}
+@@ -1,1 +1,2 @@
+ # existing
++# untrusted injection
+"""
+    valid, targets, msg = validate_patch_blast_radius(diff)
+    assert valid is False
+    assert "Forbidden file modification detected" in msg
+    assert forbidden_path in msg
+

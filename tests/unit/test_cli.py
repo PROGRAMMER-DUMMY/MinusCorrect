@@ -40,6 +40,11 @@ def test_cli_parser_commands():
     assert args_verify.fix is True
     assert args_verify.strict is True
 
+    # Subcommand: doctor
+    args_doctor = parser.parse_args(["doctor", "--json"])
+    assert args_doctor.command == "doctor"
+    assert args_doctor.json is True
+
 
 def test_cli_run_missing_command(capsys):
     parser = build_parser()
@@ -151,3 +156,51 @@ def test_cli_main_entry_point(monkeypatch):
     # Test main dispatch with no arguments displays help and returns 0
     exit_code = main([])
     assert exit_code == 0
+
+
+def test_cli_parser_timeout_and_isolate_env(monkeypatch):
+    monkeypatch.delenv("MINUSCORRECT_TIMEOUT", raising=False)
+    parser = build_parser()
+
+    # Default timeout and isolate_env
+    args_default = parser.parse_args(["run", "--", "pytest"])
+    assert args_default.timeout == 300.0
+    assert args_default.isolate_env is False
+
+    # Explicit --timeout
+    args_long = parser.parse_args(["run", "--timeout", "45.0", "--", "pytest"])
+    assert args_long.timeout == 45.0
+
+    # Explicit -t flag
+    args_short = parser.parse_args(["run", "-t", "60.0", "--", "pytest"])
+    assert args_short.timeout == 60.0
+
+    # Explicit --isolate-env
+    args_iso = parser.parse_args(["run", "--isolate-env", "--", "pytest"])
+    assert args_iso.isolate_env is True
+
+    # MINUSCORRECT_TIMEOUT environment variable changes default
+    monkeypatch.setenv("MINUSCORRECT_TIMEOUT", "150.0")
+    parser_env = build_parser()
+    args_env = parser_env.parse_args(["run", "--", "pytest"])
+    assert args_env.timeout == 150.0
+
+
+def test_cli_handle_run_forwards_timeout_and_isolate_env(monkeypatch):
+    from unittest.mock import patch, MagicMock
+
+    parser = build_parser()
+    args = parser.parse_args(["run", "-t", "75.0", "--isolate-env", "--", "pytest"])
+
+    mock_sup = MagicMock()
+    mock_sup.state.reset = MagicMock()
+    mock_sup.run_step.return_value = {"status": "SUCCESS"}
+
+    with patch("minuscorrect.cli.AgentSupervisor", return_value=mock_sup) as mock_class:
+        code = handle_run(args)
+        assert code == 0
+        mock_class.assert_called_once()
+        _, kwargs = mock_class.call_args
+        assert kwargs["timeout"] == 75.0
+        assert kwargs["isolate_env"] is True
+

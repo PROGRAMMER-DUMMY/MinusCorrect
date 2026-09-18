@@ -76,6 +76,52 @@ def run_git_command(args: List[str], cwd: Optional[Path] = None) -> Tuple[int, s
     return res.returncode, res.stdout.strip(), res.stderr.strip()
 
 
+# Sensitive credential and token patterns filtered out when isolate_env is active
+SENSITIVE_ENV_PATTERNS = [
+    r"^GITHUB_TOKEN$",
+    r"^GH_TOKEN$",
+    r"^AWS_.*$",
+    r"^AZURE_.*$",
+    r"^OPENAI_API_KEY$",
+    r"^ANTHROPIC_API_KEY$",
+    r"^GEMINI_API_KEY$",
+    r"^DATABASE_URL$",
+    r"^.*_SECRET$",
+    r"^.*_PASSWORD$",
+    r"^.*_PRIVATE_KEY$",
+]
+
+
+def sanitize_environment(env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    """
+    Constructs a sanitized copy of environment variables, filtering out credentials
+    and secret tokens unless listed in MINUSCORRECT_PASSTHROUGH_ENV.
+
+    # Rationale: Defends against exfiltration of host credentials during autonomous agent test runs.
+    """
+    source_env = dict(os.environ) if env is None else dict(env)
+    passthrough_raw = source_env.get(
+        "MINUSCORRECT_PASSTHROUGH_ENV",
+        os.environ.get("MINUSCORRECT_PASSTHROUGH_ENV", "")
+    )
+    passthrough_keys = {k.strip() for k in passthrough_raw.split(",") if k.strip()}
+    passthrough_upper = {k.upper() for k in passthrough_keys}
+
+    sanitized: Dict[str, str] = {}
+    for key, value in source_env.items():
+        if key in passthrough_keys or key.upper() in passthrough_upper:
+            sanitized[key] = value
+            continue
+
+        is_sensitive = any(
+            re.match(pattern, key, re.IGNORECASE) for pattern in SENSITIVE_ENV_PATTERNS
+        )
+        if not is_sensitive:
+            sanitized[key] = value
+
+    return sanitized
+
+
 @dataclass
 class SessionState:
     session_id: str = "default"
@@ -131,14 +177,17 @@ class AgentSupervisor:
         session_id: str = "default",
         max_iterations: int = 4,
         target_file: Optional[Path] = None,
-        timeout: float = 120.0,
+        timeout: Optional[float] = None,
+        isolate_env: bool = False,
         webhook_url: Optional[str] = None,
         cwd: Optional[Path] = None,
     ):
         self.session_id = session_id
         self.max_iterations = max_iterations
         self.target_file = target_file.resolve() if target_file else None
-        self.timeout = timeout
+        # Rationale: Default to MINUSCORRECT_TIMEOUT environment variable or fallback to 300.0s
+        self.timeout = float(timeout) if timeout is not None else float(os.environ.get("MINUSCORRECT_TIMEOUT", "300.0"))
+        self.isolate_env = isolate_env
         self.webhook_url = webhook_url or os.environ.get("MINUSCORRECT_WEBHOOK_URL")
         self.cwd = Path(cwd).resolve() if cwd else None
         self.state = SessionState.load(session_id)
@@ -264,6 +313,8 @@ class AgentSupervisor:
         print(f"\n[SUPERVISOR] Executing verification iteration {iteration}/{self.max_iterations} (Session: '{self.session_id}')...")
 
         # Execute test command with timeout protection
+        # Rationale: Sanitize ambient credentials and tokens when isolate_env is requested
+        sanitized_env = sanitize_environment() if self.isolate_env else None
         try:
             res = subprocess.run(
                 test_cmd,
@@ -273,7 +324,8 @@ class AgentSupervisor:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=effective_timeout
+                timeout=effective_timeout,
+                env=sanitized_env,
             )
             code, out, err = res.returncode, res.stdout, res.stderr
         except subprocess.TimeoutExpired as exc:

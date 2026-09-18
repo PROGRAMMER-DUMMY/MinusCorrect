@@ -5,6 +5,7 @@ MinusCorrect Unified Command-Line Interface
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import List
@@ -25,7 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--target", help="Target source file being modified")
     run_parser.add_argument("--session-id", default="default", help="Session ID for state persistence")
     run_parser.add_argument("--max-iterations", type=int, default=4, help="Maximum solver iterations before hard abort")
-    run_parser.add_argument("--timeout", type=float, default=120.0, help="Execution timeout in seconds (default: 120.0)")
+    run_parser.add_argument("-t", "--timeout", type=float, default=float(os.environ.get("MINUSCORRECT_TIMEOUT", "300.0")), help="Execution timeout in seconds (default: 300.0 or MINUSCORRECT_TIMEOUT)")
+    run_parser.add_argument("--isolate-env", action="store_true", help="Sanitize ambient credentials/tokens from test subprocess environment")
     run_parser.add_argument("--webhook-url", help="Webhook endpoint for operational alert notifications")
     run_parser.add_argument("--worktree", action="store_true", help="Execute test run inside an isolated ephemeral git worktree")
     run_parser.add_argument("--reset", action="store_true", help="Reset session before execution")
@@ -73,6 +75,10 @@ def build_parser() -> argparse.ArgumentParser:
     # Command: mcp
     subparsers.add_parser("mcp", help="Launch Model Context Protocol (MCP) JSON-RPC 2.0 stdio server")
 
+    # Command: doctor
+    doctor_parser = subparsers.add_parser("doctor", help="Run pre-flight environment diagnostics and health checks")
+    doctor_parser.add_argument("--json", action="store_true", help="Output diagnostic results in JSON format")
+
     return parser
 
 
@@ -87,7 +93,8 @@ def handle_run(args: argparse.Namespace) -> int:
         return 1
 
     target_path = Path(args.target) if args.target else None
-    timeout_val = getattr(args, "timeout", 120.0)
+    timeout_val = getattr(args, "timeout", None)
+    isolate_env_val = getattr(args, "isolate_env", False)
     webhook_url = getattr(args, "webhook_url", None)
     use_worktree = getattr(args, "worktree", False)
 
@@ -100,6 +107,7 @@ def handle_run(args: argparse.Namespace) -> int:
                 max_iterations=args.max_iterations,
                 target_file=target_path,
                 timeout=timeout_val,
+                isolate_env=isolate_env_val,
                 webhook_url=webhook_url,
                 cwd=wt_path,
             )
@@ -113,6 +121,7 @@ def handle_run(args: argparse.Namespace) -> int:
             max_iterations=args.max_iterations,
             target_file=target_path,
             timeout=timeout_val,
+            isolate_env=isolate_env_val,
             webhook_url=webhook_url,
         )
         if args.reset:
@@ -309,9 +318,23 @@ def main(argv: List[str] = None) -> int:
         return handle_pr(args)
     elif args.command == "mcp":
         return handle_mcp(args)
+    elif args.command == "doctor":
+        return handle_doctor(args)
     else:
         parser.print_help()
         return 0
+
+
+def handle_doctor(args: argparse.Namespace) -> int:
+    from minuscorrect.doctor import format_diagnostic_json, format_diagnostic_text, run_diagnostics
+    checks = run_diagnostics()
+    if getattr(args, "json", False):
+        print(format_diagnostic_json(checks))
+    else:
+        print(format_diagnostic_text(checks))
+
+    has_failure = any(c.status == "FAIL" for c in checks)
+    return 1 if has_failure else 0
 
 
 def handle_mcp(args: argparse.Namespace) -> int:
@@ -335,7 +358,8 @@ def supervisor_main() -> int:
     parser.add_argument("--target", help="Target source file")
     parser.add_argument("--session-id", default="default")
     parser.add_argument("--max-iterations", type=int, default=4)
-    parser.add_argument("--timeout", type=float, default=120.0, help="Execution timeout in seconds")
+    parser.add_argument("-t", "--timeout", type=float, default=float(os.environ.get("MINUSCORRECT_TIMEOUT", "300.0")), help="Execution timeout in seconds (default: 300.0 or MINUSCORRECT_TIMEOUT)")
+    parser.add_argument("--isolate-env", action="store_true", help="Sanitize ambient credentials/tokens from test subprocess environment")
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("test_cmd", nargs=argparse.REMAINDER)
 

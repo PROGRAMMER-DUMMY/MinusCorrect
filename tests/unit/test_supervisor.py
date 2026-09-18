@@ -158,3 +158,114 @@ def test_supervisor_safe_rollback_preserves_env(tmp_path, monkeypatch):
     assert env_local.read_text(encoding="utf-8") == "LOCAL_CONFIG=true"
 
 
+def test_supervisor_configurable_timeout_default_and_env(monkeypatch):
+    monkeypatch.delenv("MINUSCORRECT_TIMEOUT", raising=False)
+    sup_default = AgentSupervisor(session_id="test_timeout_default")
+    assert sup_default.timeout == 300.0
+
+    monkeypatch.setenv("MINUSCORRECT_TIMEOUT", "45.5")
+    sup_env = AgentSupervisor(session_id="test_timeout_env")
+    assert sup_env.timeout == 45.5
+
+    # Explicit timeout parameter overrides environment variable
+    sup_override = AgentSupervisor(session_id="test_timeout_override", timeout=12.0)
+    assert sup_override.timeout == 12.0
+
+
+def test_sanitize_environment_filters_sensitive_credentials():
+    from minuscorrect.supervisor import sanitize_environment
+
+    env = {
+        "PATH": "/usr/bin;C:\\Windows",
+        "SYSTEMROOT": "C:\\Windows",
+        "SAFE_KEY": "public-val",
+        "GITHUB_TOKEN": "ghp_secret_token",
+        "GH_TOKEN": "gh_secret_token",
+        "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+        "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        "AZURE_CLIENT_SECRET": "azure_secret",
+        "AZURE_SUBSCRIPTION_ID": "azure_sub",
+        "OPENAI_API_KEY": "sk-openai-12345",
+        "ANTHROPIC_API_KEY": "sk-ant-12345",
+        "GEMINI_API_KEY": "AIzaSyFakeGeminiKey",
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/db",
+        "APP_SECRET": "super_secret_hash",
+        "DB_PASSWORD": "db_password_123",
+        "SSL_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----",
+    }
+
+    sanitized = sanitize_environment(env)
+
+    # Safe keys are retained
+    assert sanitized["PATH"] == "/usr/bin;C:\\Windows"
+    assert sanitized["SYSTEMROOT"] == "C:\\Windows"
+    assert sanitized["SAFE_KEY"] == "public-val"
+
+    # All sensitive keys are filtered out
+    assert "GITHUB_TOKEN" not in sanitized
+    assert "GH_TOKEN" not in sanitized
+    assert "AWS_ACCESS_KEY_ID" not in sanitized
+    assert "AWS_SECRET_ACCESS_KEY" not in sanitized
+    assert "AZURE_CLIENT_SECRET" not in sanitized
+    assert "AZURE_SUBSCRIPTION_ID" not in sanitized
+    assert "OPENAI_API_KEY" not in sanitized
+    assert "ANTHROPIC_API_KEY" not in sanitized
+    assert "GEMINI_API_KEY" not in sanitized
+    assert "DATABASE_URL" not in sanitized
+    assert "APP_SECRET" not in sanitized
+    assert "DB_PASSWORD" not in sanitized
+    assert "SSL_PRIVATE_KEY" not in sanitized
+
+
+def test_sanitize_environment_passthrough_whitelist():
+    from minuscorrect.supervisor import sanitize_environment
+
+    env = {
+        "GITHUB_TOKEN": "ghp_secret_token",
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/db",
+        "OPENAI_API_KEY": "sk-openai-12345",
+        "AWS_REGION": "us-east-1",
+        "MINUSCORRECT_PASSTHROUGH_ENV": "GITHUB_TOKEN, DATABASE_URL",
+    }
+
+    sanitized = sanitize_environment(env)
+
+    # Whitelisted keys are preserved
+    assert sanitized["GITHUB_TOKEN"] == "ghp_secret_token"
+    assert sanitized["DATABASE_URL"] == "postgresql://user:pass@localhost:5432/db"
+
+    # Non-whitelisted sensitive keys remain stripped
+    assert "OPENAI_API_KEY" not in sanitized
+    assert "AWS_REGION" not in sanitized
+
+
+def test_supervisor_run_step_isolate_env(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_TOKEN", "should_not_leak")
+    monkeypatch.setenv("OPENAI_API_KEY", "should_not_leak_either")
+
+    # With isolate_env=True: subprocess cannot see sensitive variables
+    sup_isolated = AgentSupervisor(session_id="test_iso_true", isolate_env=True)
+    check_code = (
+        "import os, sys; "
+        "has_leak = 'GITHUB_TOKEN' in os.environ or 'OPENAI_API_KEY' in os.environ; "
+        "sys.exit(1 if has_leak else 0)"
+    )
+    res_iso = sup_isolated.run_step(["python", "-c", check_code])
+    assert res_iso["status"] == "SUCCESS"
+    assert sup_isolated.state.history[-1]["exit_code"] == 0
+
+    # With isolate_env=False: ambient environment is preserved
+    sup_ambient = AgentSupervisor(session_id="test_iso_false", isolate_env=False)
+    check_ambient_code = (
+        "import os, sys; "
+        "present = 'GITHUB_TOKEN' in os.environ and 'OPENAI_API_KEY' in os.environ; "
+        "sys.exit(0 if present else 1)"
+    )
+    res_amb = sup_ambient.run_step(["python", "-c", check_ambient_code])
+    assert res_amb["status"] == "SUCCESS"
+    assert sup_ambient.state.history[-1]["exit_code"] == 0
+
+
+
+

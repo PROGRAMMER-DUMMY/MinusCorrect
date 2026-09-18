@@ -83,3 +83,80 @@ def test_ephemeral_worktree_preserve_branch_on_success(temp_git_repo):
 
     # Clean up preserved branch
     subprocess.run(["git", "branch", "-D", branch_name], cwd=str(temp_git_repo), check=True)
+
+
+def test_worktree_session_alias():
+    from minuscorrect.worktree import WorktreeSession
+    assert WorktreeSession is EphemeralWorktree
+
+
+def test_ephemeral_worktree_idempotent_double_cleanup(temp_git_repo):
+    wt = EphemeralWorktree(repo_root=temp_git_repo)
+    wt.create()
+    assert wt._created is True
+
+    wt.cleanup()
+    assert wt._created is False
+
+    # Second cleanup call should return immediately without error
+    wt.cleanup()
+    assert wt._created is False
+
+
+def test_atexit_and_signal_traps_lifecycle(temp_git_repo, monkeypatch):
+    registered_atexit = []
+    unregistered_atexit = []
+
+    monkeypatch.setattr("atexit.register", lambda fn: registered_atexit.append(fn))
+    monkeypatch.setattr("atexit.unregister", lambda fn: unregistered_atexit.append(fn))
+
+    wt = EphemeralWorktree(repo_root=temp_git_repo)
+    wt.create()
+
+    assert wt._exit_handler in registered_atexit
+    assert wt._created is True
+
+    # Check signal handler behavior
+    import signal
+    import pytest
+
+    with pytest.raises(SystemExit) as exc_info:
+        wt._signal_handler(signal.SIGINT, None)
+
+    assert exc_info.value.code == 128 + signal.SIGINT
+    assert wt._created is False
+    assert wt._exit_handler in unregistered_atexit
+
+
+def test_cleanup_retry_on_permission_error(temp_git_repo, monkeypatch):
+    import shutil
+
+    wt = EphemeralWorktree(repo_root=temp_git_repo)
+    wt.create()
+
+    orig_run = subprocess.run
+
+    def mock_run(cmd, *args, **kwargs):
+        if isinstance(cmd, list) and "remove" in cmd:
+            # Simulate git removing worktree from git tracking but leaving folder on disk
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return orig_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    attempts = []
+    original_rmtree = shutil.rmtree
+
+    def mock_rmtree(path, ignore_errors=False):
+        attempts.append(ignore_errors)
+        if len(attempts) < 2:
+            raise PermissionError("Simulated Windows file lock")
+        original_rmtree(path, ignore_errors=ignore_errors)
+
+    monkeypatch.setattr("shutil.rmtree", mock_rmtree)
+
+    wt.cleanup()
+    assert wt._created is False
+    assert len(attempts) >= 2
+
+

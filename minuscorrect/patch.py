@@ -16,6 +16,8 @@ from typing import List, Optional, Set, Tuple
 
 
 # Critical files that untrusted agent patches are strictly forbidden from touching
+# Rationale: Untrusted agent patches must not subvert build manifests, CI workflows,
+# task runners, test configurations, or container specifications outside permitted application scope.
 FORBIDDEN_PATCH_PATTERNS = [
     r"(^|/)conftest\.py$",
     r"(^|/)\.github/",
@@ -25,6 +27,13 @@ FORBIDDEN_PATCH_PATTERNS = [
     r"^requirements.*\.txt$",
     r"(^|/)\.env.*",
     r"(^|/)\.venv.*",
+    r"(^|/)Makefile$",
+    r"(^|/)tox\.ini$",
+    r"(^|/)noxfile\.py$",
+    r"(^|/)(Dockerfile|Containerfile).*$",
+    r"(^|/)docker-compose.*\.ya?ml$",
+    r"(^|/)\.gitlab-ci\.ya?ml$",
+    r"(^|/)\.circleci/",
 ]
 
 
@@ -71,10 +80,16 @@ def validate_patch_blast_radius(
             violations.append(f"Path traversal attempt detected in '{target}'")
             continue
 
-        # 2. Forbidden files (conftest.py, CI, setup.py)
+        # 2. Forbidden files (conftest.py, build manifests, CI workflows, task runners)
+        # Rationale: Untrusted agent patches must not subvert build manifests, CI workflows,
+        # task runners, test configurations, or container specifications.
         normalized = target.replace("\\", "/")
+        target_candidates = [normalized]
+        if normalized.startswith("./"):
+            target_candidates.append(normalized[2:])
+
         for pattern in FORBIDDEN_PATCH_PATTERNS:
-            if re.search(pattern, normalized, re.IGNORECASE):
+            if any(re.search(pattern, cand, re.IGNORECASE) for cand in target_candidates):
                 violations.append(
                     f"Forbidden file modification detected: '{target}' matches protected pattern '{pattern}'"
                 )
