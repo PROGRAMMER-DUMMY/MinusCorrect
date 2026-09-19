@@ -84,6 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
     council_parser = subparsers.add_parser("council", help="Convene the 5-advisor LLM Council protocol")
     council_parser.add_argument("query", nargs="?", default=None, help="Architectural question, trade-off, or bug triage dilemma")
     council_parser.add_argument("--json", action="store_true", help="Output council prompt schema in JSON")
+    council_parser.add_argument("--decision-engine", choices=["auto", "local", "jev", "mock"], default="auto", help="Decision engine for council Stage-2 evaluation (default: auto)")
 
     # Command: ask-matt
     ask_matt_parser = subparsers.add_parser("ask-matt", help="Generate Matt Pocock Spec-to-Tickets DAG execution plan")
@@ -93,6 +94,12 @@ def build_parser() -> argparse.ArgumentParser:
     # Command: plugin
     plugin_parser = subparsers.add_parser("plugin", help="Manage MinusCorrect agent integrations (Antigravity CLI, Claude Code)")
     plugin_parser.add_argument("action", choices=["status", "install"], help="Action to perform: 'status' or 'install'")
+
+    # Command: harness
+    harness_parser = subparsers.add_parser("harness", help="Manage SuperQode harness integrations and specs")
+    harness_subparsers = harness_parser.add_subparsers(dest="harness_action")
+    harness_export = harness_subparsers.add_parser("export", help="Export MinusCorrect SuperQode HarnessSpec")
+    harness_export.add_argument("--format", choices=["json", "yaml"], default="json", help="Output format (default: json)")
 
     return parser
 
@@ -345,9 +352,21 @@ def main(argv: List[str] = None) -> int:
         return handle_ask_matt(args)
     elif args.command == "plugin":
         return handle_plugin(args)
+    elif args.command == "harness":
+        return handle_harness(args)
     else:
         parser.print_help()
         return 0
+
+
+def handle_harness(args: argparse.Namespace) -> int:
+    from minuscorrect.harness import export_superqode_harness_spec
+    action = getattr(args, "harness_action", "export") or "export"
+    if action == "export":
+        fmt = getattr(args, "format", "json")
+        print(export_superqode_harness_spec(format_type=fmt))
+        return 0
+    return 0
 
 
 def handle_council(args: argparse.Namespace) -> int:

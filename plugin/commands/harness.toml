@@ -1,0 +1,2 @@
+description = "Export or inspect SuperQode HarnessSpec for MinusCorrect"
+prompt = "Run 'minuscorrect harness export' to view the SuperQode HarnessSpec binding MinusCorrect's execution isolation, circuit-breaker rules, and Middle-Ring decision engine."

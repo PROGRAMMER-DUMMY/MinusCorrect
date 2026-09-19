@@ -98,6 +98,66 @@ def generate_council_protocol(query: Optional[str] = None, as_json: bool = False
     return "\n".join(lines)
 
 
+def evaluate_council_consensus(
+    proposals: List[Dict[str, str]],
+    engine: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Evaluate LLM Council Stage-2 consensus using the Middle-Ring DecisionEngine.
+    # verifies: tests/unit/test_orchestrator.py
+    """
+    if engine is None:
+        from minuscorrect.decision import get_decision_engine
+        engine = get_decision_engine("auto")
+
+    state_lines = ["COUNCIL ADVISOR PROPOSALS:"]
+    for p in proposals:
+        adv = p.get("advisor", "Unknown")
+        stance = p.get("stance", p.get("content", ""))
+        state_lines.append(f"[{adv}]: {stance}")
+    state = "\n".join(state_lines)
+
+    from minuscorrect.types.decision import Choice, DecisionBatch, Noul, Score
+
+    batch = DecisionBatch(
+        state=state,
+        questions={
+            "consensus_score": Score(
+                instructions="Score overall council consensus and alignment on non-negotiable invariants",
+                min_val=0.0,
+                max_val=10.0,
+            ),
+            "fatal_flaw_detected": Noul(
+                instructions="A fatal unmitigated flaw or fatal regression was identified that requires aborting",
+                threshold=0.6,
+            ),
+            "actionable_now": Noul(
+                instructions="The proposals formulate a concrete, viable implementation plan ready for execution",
+                threshold=0.5,
+            ),
+            "recommended_action": Choice(
+                instructions="Recommend next pipeline phase based on council consensus",
+                criteria={
+                    "proceed_to_spec": "Solid consensus; proceed to Ask-Matt architectural spec",
+                    "revise_proposal": "Substantive clash requiring another round of advisor deliberation",
+                    "hard_abort": "Fatal flaw discovered; abandon proposal",
+                },
+            ),
+        },
+    )
+
+    response = engine.evaluate(batch)
+    return {
+        "consensus_score": getattr(response.answers.get("consensus_score"), "score", 5.0),
+        "fatal_flaw_detected": getattr(response.answers.get("fatal_flaw_detected"), "passed", False),
+        "actionable_now": getattr(response.answers.get("actionable_now"), "passed", True),
+        "recommended_action": getattr(response.answers.get("recommended_action"), "choice", "proceed_to_spec"),
+        "latency_ms": response.latency_ms,
+        "provider": response.provider,
+        "raw_answers": {k: v.to_dict() for k, v in response.answers.items()},
+    }
+
+
 def generate_ask_matt_plan(idea: Optional[str] = None, as_json: bool = False) -> str:
     """
     Generate an Ask-Matt Spec-to-Tickets DAG implementation plan.

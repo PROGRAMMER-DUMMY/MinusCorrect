@@ -1,0 +1,58 @@
+{
+  "query": "Should MinusCorrect integrate Jev and SuperQode?",
+  "mock_ballots": [
+    {
+      "advisor": "The Contrarian",
+      "stance": "Veto on probabilistic safety gates; zero-leakage invariant violated by remote APIs.",
+      "score": 2.0
+    },
+    {
+      "advisor": "The First Principles Thinker",
+      "stance": "Strict boundary: Heuristics propose, determinism enforces. Safe in Middle Ring only.",
+      "score": 8.0
+    },
+    {
+      "advisor": "The Expansionist",
+      "stance": "High upside: 70ms peer scoring and MinusCorrect as universal POSIX kernel for harnesses.",
+      "score": 9.5
+    },
+    {
+      "advisor": "The Outsider",
+      "stance": "Local-first ergonomics must be preserved; optional zero-dependency adapter only.",
+      "score": 6.5
+    },
+    {
+      "advisor": "The Executor",
+      "stance": "Ship 3 tracer-bullet tickets: decision protocol, harness adapter, council peer scoring.",
+      "score": 9.0
+    }
+  ],
+  "mock_jev_response": {
+    "answers": {
+      "consensus_score": {
+        "score": 7.0,
+        "confidence": 0.95,
+        "explanation": "Strong consensus on Three-Ring architecture and local-first fallback"
+      },
+      "fatal_flaw_detected": {
+        "noul": 0.05,
+        "confidence": 0.98
+      },
+      "actionable_now": {
+        "noul": 0.92,
+        "confidence": 0.94
+      },
+      "recommended_action": {
+        "choice": "proceed_to_spec",
+        "distribution": {
+          "proceed_to_spec": 0.88,
+          "revise_proposal": 0.10,
+          "hard_abort": 0.02
+        },
+        "confidence": 0.88
+      }
+    },
+    "latency_ms": 78.4,
+    "provider": "jev-systemone"
+  }
+}
