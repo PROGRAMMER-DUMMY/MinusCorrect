@@ -1,0 +1,2 @@
+description = "Run MinusCorrect systemic integrity verification and auto-clean debug logs"
+prompt = "Run 'python scripts/verify_integrity.py --fix --strict' to ensure golden contracts are untouched, docstring claims have test receipts, and zero residual [DEBUG] logs remain in source code."

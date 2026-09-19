@@ -1,0 +1,2 @@
+description = "Run pre-flight environment diagnostics and health checks"
+prompt = "Run 'minuscorrect doctor' to check git repository status, Python version, pytest availability, test directory structure, worktree capability, and ambient environment security. Report any warnings or errors."

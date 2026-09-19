@@ -1,0 +1,5 @@
+{
+  "name": "minuscorrect",
+  "version": "1.0.0",
+  "description": "Autonomous corrective runtime, process isolation supervisor, LLM Council, and Ask-Matt orchestration protocol for coding agents."
+}

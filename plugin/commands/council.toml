@@ -1,0 +1,2 @@
+description = "Run a question, architecture decision, or bug triage through the 5-advisor LLM Council"
+prompt = "Convene the LLM Council to analyze {{args}}. Run independent analysis through the 5 thinking lenses: 1. The Contrarian, 2. The First Principles Thinker, 3. The Expansionist, 4. The Outsider, 5. The Executor. Peer-review each perspective anonymously, synthesize a final verdict, and formulate an Ask-Matt execution plan."

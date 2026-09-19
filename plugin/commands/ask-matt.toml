@@ -1,0 +1,2 @@
+description = "Matt Pocock's Ask-Matt: Decompose an idea or bug into an Architectural Spec and Tracer-Bullet Tickets DAG"
+prompt = "Decompose {{args}} using the Ask-Matt execution protocol: 1. Produce an Architectural Specification (/to-spec) with core invariants and protected boundaries. 2. Break down into vertical tracer-bullet tickets (/to-tickets) forming a dependency DAG with explicit in-scope and out-of-scope boundaries. 3. Assign each ticket to a domain specialist persona. 4. Define TDD verification criteria for MinusCorrect supervision."

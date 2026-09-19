@@ -209,3 +209,44 @@ def test_cli_handle_run_forwards_timeout_and_isolate_env(monkeypatch):
         assert kwargs["timeout"] == 75.0
         assert kwargs["isolate_env"] is True
 
+
+def test_cli_council_and_ask_matt(capsys):
+    parser = build_parser()
+
+    # Council command
+    args_council = parser.parse_args(["council", "Should we refactor authentication?", "--json"])
+    assert args_council.command == "council"
+    assert args_council.query == "Should we refactor authentication?"
+    assert args_council.json is True
+
+    from minuscorrect.cli import handle_council
+    code = handle_council(args_council)
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "The Contrarian" in out
+
+    # Ask-Matt command
+    args_matt = parser.parse_args(["ask-matt", "Implement token refresh loop"])
+    assert args_matt.command == "ask-matt"
+    assert args_matt.idea == "Implement token refresh loop"
+
+    from minuscorrect.cli import handle_ask_matt
+    code = handle_ask_matt(args_matt)
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "TRACER-BULLET TICKETS DAG" in out
+
+
+def test_cli_plugin_status(capsys):
+    parser = build_parser()
+    args_status = parser.parse_args(["plugin", "status"])
+    assert args_status.command == "plugin"
+    assert args_status.action == "status"
+
+    from minuscorrect.cli import handle_plugin
+    code = handle_plugin(args_status)
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "MinusCorrect Plugin Status" in out
+
+

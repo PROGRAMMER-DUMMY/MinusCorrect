@@ -80,6 +80,20 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser = subparsers.add_parser("doctor", help="Run pre-flight environment diagnostics and health checks")
     doctor_parser.add_argument("--json", action="store_true", help="Output diagnostic results in JSON format")
 
+    # Command: council
+    council_parser = subparsers.add_parser("council", help="Convene the 5-advisor LLM Council protocol")
+    council_parser.add_argument("query", nargs="?", default=None, help="Architectural question, trade-off, or bug triage dilemma")
+    council_parser.add_argument("--json", action="store_true", help="Output council prompt schema in JSON")
+
+    # Command: ask-matt
+    ask_matt_parser = subparsers.add_parser("ask-matt", help="Generate Matt Pocock Spec-to-Tickets DAG execution plan")
+    ask_matt_parser.add_argument("idea", nargs="?", default=None, help="Feature request or bug report to decompose")
+    ask_matt_parser.add_argument("--json", action="store_true", help="Output tickets schema in JSON")
+
+    # Command: plugin
+    plugin_parser = subparsers.add_parser("plugin", help="Manage MinusCorrect agent integrations (Antigravity CLI, Claude Code)")
+    plugin_parser.add_argument("action", choices=["status", "install"], help="Action to perform: 'status' or 'install'")
+
     return parser
 
 
@@ -325,9 +339,49 @@ def main(argv: List[str] = None) -> int:
         return handle_mcp(args)
     elif args.command == "doctor":
         return handle_doctor(args)
+    elif args.command == "council":
+        return handle_council(args)
+    elif args.command == "ask-matt":
+        return handle_ask_matt(args)
+    elif args.command == "plugin":
+        return handle_plugin(args)
     else:
         parser.print_help()
         return 0
+
+
+def handle_council(args: argparse.Namespace) -> int:
+    from minuscorrect.orchestrator import generate_council_protocol
+    output = generate_council_protocol(query=args.query, as_json=getattr(args, "json", False))
+    print(output)
+    return 0
+
+
+def handle_ask_matt(args: argparse.Namespace) -> int:
+    from minuscorrect.orchestrator import generate_ask_matt_plan
+    output = generate_ask_matt_plan(idea=args.idea, as_json=getattr(args, "json", False))
+    print(output)
+    return 0
+
+
+def handle_plugin(args: argparse.Namespace) -> int:
+    from minuscorrect.orchestrator import inspect_plugin_status, install_plugin
+    if args.action == "status":
+        status = inspect_plugin_status()
+        print("MinusCorrect Plugin Status:")
+        print(f"  Installed: {status['plugin_installed']}")
+        print(f"  Location:  {status['plugin_directory']}")
+        print(f"  Imported in agy: {status['agy_imported']}")
+        print("  Skills Registered:")
+        for name, present in status["skills_registered"].items():
+            mark = "[OK]" if present else "[MISSING]"
+            print(f"    {mark:<10} {name}")
+        return 0
+    elif args.action == "install":
+        ok, msg = install_plugin()
+        print(msg)
+        return 0 if ok else 1
+    return 1
 
 
 def handle_doctor(args: argparse.Namespace) -> int:
