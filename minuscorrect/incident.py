@@ -63,22 +63,29 @@ PROMPT_INJECTION_PATTERNS = [
 ]
 
 
-def sanitize_incident_payload(raw_text: str) -> str:
+def sanitize_incident_payload(raw_text: str, defang: bool = True) -> str:
     """
     Sanitizes raw crash telemetry by:
-    1. Defanging adversarial prompt-injection payloads in untrusted strings.
+    1. Defanging adversarial prompt-injection payloads in untrusted strings (unless defang=False).
     2. Redacting sensitive credentials, secrets, PII, and network identifiers.
+
+    # Rationale: Allows security and prompt engineers to preserve verbatim attack strings via --no-defang or MINUSCORRECT_PRESERVE_PAYLOAD=1.
     """
     if not raw_text:
         return ""
 
     sanitized = raw_text
 
-    # 1. Defang adversarial prompt injection tokens first
-    for pattern, replacement in PROMPT_INJECTION_PATTERNS:
-        sanitized = re.sub(pattern, replacement, sanitized)
+    # Respect environment variable override
+    if os.environ.get("MINUSCORRECT_PRESERVE_PAYLOAD") == "1":
+        defang = False
 
-    # 2. Redact sensitive credentials and PII
+    # 1. Defang adversarial prompt injection tokens (if enabled)
+    if defang:
+        for pattern, replacement in PROMPT_INJECTION_PATTERNS:
+            sanitized = re.sub(pattern, replacement, sanitized)
+
+    # 2. Redact sensitive credentials and PII (always active)
     for pattern, replacement in SECRET_REDACTION_PATTERNS:
         sanitized = re.sub(pattern, replacement, sanitized)
 
@@ -98,6 +105,7 @@ class IncidentReport:
     stack_trace: str = ""
     raw_sanitized: str = ""
     error_hash: str = ""
+    defanged: bool = True
 
     def __post_init__(self):
         if not self.error_hash:
@@ -105,12 +113,16 @@ class IncidentReport:
             self.error_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()[:16]
 
 
-def parse_incident_payload(raw: Union[str, Dict[str, Any]], incident_id: Optional[str] = None) -> IncidentReport:
+def parse_incident_payload(
+    raw: Union[str, Dict[str, Any]],
+    incident_id: Optional[str] = None,
+    defang: bool = True,
+) -> IncidentReport:
     """
     Parses a Sentry/Datadog JSON payload or raw stack trace into a sanitized IncidentReport.
     """
     raw_str = raw if isinstance(raw, str) else json.dumps(raw, indent=2)
-    sanitized_text = sanitize_incident_payload(raw_str)
+    sanitized_text = sanitize_incident_payload(raw_str, defang=defang)
 
     # Attempt to parse as JSON
     parsed_json: Optional[Dict[str, Any]] = None
@@ -148,7 +160,7 @@ def parse_incident_payload(raw: Union[str, Dict[str, Any]], incident_id: Optiona
             exc_type = parsed_json.get("error.kind", parsed_json.get("error_type", "RuntimeError"))
             exc_msg = parsed_json.get("error.message", parsed_json.get("message", ""))
             stack_trace = parsed_json.get("error.stack", parsed_json.get("stacktrace", ""))
-            sanitized_inputs = parsed_json.get("attributes", parsed_json.get("context", {}))
+            sanitized_inputs = parsed_json.get("inputs", parsed_json.get("attributes", parsed_json.get("context", {})))
         # 3. Simple key-value crash dict
         else:
             exc_type = parsed_json.get("type", parsed_json.get("exception", "Exception"))
@@ -185,7 +197,8 @@ def parse_incident_payload(raw: Union[str, Dict[str, Any]], incident_id: Optiona
         failing_function=failing_func,
         sanitized_inputs=sanitized_inputs,
         stack_trace=stack_trace,
-        raw_sanitized=sanitized_text
+        raw_sanitized=sanitized_text,
+        defanged=defang,
     )
 
 
@@ -199,10 +212,17 @@ def generate_staged_test(
     Requires human review before promotion to tests/golden/.
     """
     safe_id = re.sub(r"\W+", "_", report.incident_id).strip("_").lower()
+    target_dir = test_path.parent if test_path else (output_dir or (Path("tests") / "staging"))
+    target_dir.mkdir(parents=True, exist_ok=True)
     if test_path is None:
-        target_dir = output_dir or (Path("tests") / "staging")
-        target_dir.mkdir(parents=True, exist_ok=True)
         test_path = target_dir / f"test_incident_{safe_id}.py"
+
+    # Write inert payload to fixtures directory to isolate control plane from data plane
+    # Rationale: Prevents adversarial payload strings from executing as inline Python code
+    fixtures_dir = target_dir / "fixtures"
+    fixtures_dir.mkdir(parents=True, exist_ok=True)
+    fixture_path = fixtures_dir / f"inc_{safe_id}.json"
+    fixture_path.write_text(json.dumps(report.sanitized_inputs, indent=2), encoding="utf-8")
 
     content = f'''"""
 Incident Reproduction Contract: {report.incident_id}
@@ -218,6 +238,8 @@ SAFETY & INTEGRITY NOTICE:
        ALLOW_GOLDEN_EDIT=1 git mv {test_path.as_posix()} tests/golden/
 """
 
+import json
+from pathlib import Path
 import pytest
 
 # Reproduction Metadata
@@ -225,6 +247,7 @@ INCIDENT_ID = "{report.incident_id}"
 EXCEPTION_TYPE = "{report.exception_type}"
 FAILING_MODULE = "{report.failing_module}"
 FAILING_FUNCTION = "{report.failing_function}"
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "inc_{safe_id}.json"
 
 
 def test_reproduce_incident_{safe_id}():
@@ -232,8 +255,11 @@ def test_reproduce_incident_{safe_id}():
     Verifies that the system handles the boundary condition without triggering {report.exception_type}.
     # verifies: {test_path.as_posix()}
     """
-    # Sanitized reproduction input arguments
-    inputs = {json.dumps(report.sanitized_inputs, indent=4)}
+    # Inert fixture loading: payload bytes never execute directly as Python source code
+    if FIXTURE_PATH.exists():
+        inputs = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    else:
+        inputs = {json.dumps(report.sanitized_inputs, indent=4)}
 
     # TODO (Maintainer): Connect 'inputs' to target unit entry point:
     # Example:

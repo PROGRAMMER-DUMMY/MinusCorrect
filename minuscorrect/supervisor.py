@@ -244,16 +244,20 @@ class AgentSupervisor:
 ---
 
 ## 2. Sanitized Last Stderr
+<untrusted_execution_trace>
 ```
 {sanitize_trace(last_err).strip() or "(No stderr captured)"}
 ```
+</untrusted_execution_trace>
 
 ---
 
 ## 3. Sanitized Last Stdout
+<untrusted_execution_trace>
 ```
 {sanitize_trace(last_out).strip() or "(No stdout captured)"}
 ```
+</untrusted_execution_trace>
 
 ---
 

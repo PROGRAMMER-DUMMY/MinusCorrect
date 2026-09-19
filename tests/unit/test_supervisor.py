@@ -102,6 +102,7 @@ def test_supervisor_hard_abort_and_diagnostic_report(tmp_path, monkeypatch):
     content = report_path.read_text(encoding="utf-8")
     assert "HARD_ABORT" in content
     assert "persistent defect" in content
+    assert "<untrusted_execution_trace>" in content
 
 
 def test_supervisor_execution_timeout(tmp_path, monkeypatch):

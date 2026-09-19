@@ -52,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     incident_parser.add_argument("--id", dest="incident_id", help="Explicit incident ID (e.g. INC-1042)")
     incident_parser.add_argument("--promote", action="store_true", help="Promote directly to tests/golden/ (requires ALLOW_GOLDEN_EDIT=1)")
     incident_parser.add_argument("--output-dir", default="tests/staging", help="Output directory for staged test (default: tests/staging)")
+    incident_parser.add_argument("--no-defang", action="store_true", help="Preserve raw attack payloads bit-exact without prompt injection defanging (for LLM security testing)")
 
     # Command: patch
     patch_parser = subparsers.add_parser("patch", help="Validate write blast-radius and atomically apply agent diff")
@@ -206,8 +207,12 @@ def handle_incident(args: argparse.Namespace) -> int:
         print("[ERROR] Empty incident payload received.", file=sys.stderr)
         return 1
 
-    print("[INFO] Sanitizing incident payload (defanging prompt injections & redacting PII)...")
-    report = parse_incident_payload(raw=raw_content, incident_id=args.incident_id)
+    defang_mode = not getattr(args, "no_defang", False)
+    if defang_mode:
+        print("[INFO] Sanitizing incident payload (defanging prompt injections & redacting PII)...")
+    else:
+        print("[INFO] Preserving raw incident payload (--no-defang active, redacting credentials only)...")
+    report = parse_incident_payload(raw=raw_content, incident_id=args.incident_id, defang=defang_mode)
 
     staged_test = generate_staged_test(report, output_dir=Path(args.output_dir))
     print(f"[SUCCESS] Staged reproduction contract created: {staged_test.resolve()}")

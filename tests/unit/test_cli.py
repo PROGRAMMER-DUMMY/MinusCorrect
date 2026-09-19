@@ -45,6 +45,11 @@ def test_cli_parser_commands():
     assert args_doctor.command == "doctor"
     assert args_doctor.json is True
 
+    # Subcommand: incident with --no-defang
+    args_inc = parser.parse_args(["incident", "payload.json", "--no-defang"])
+    assert args_inc.command == "incident"
+    assert args_inc.no_defang is True
+
 
 def test_cli_run_missing_command(capsys):
     parser = build_parser()
