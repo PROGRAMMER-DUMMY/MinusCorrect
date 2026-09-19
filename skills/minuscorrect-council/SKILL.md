@@ -1,20 +1,27 @@
 ---
 name: minuscorrect-council
-description: Multi-perspective LLM Council protocol for autonomous coding agents. Use for pre-execution architectural decisions, high-risk bug triage, and pressure-testing plans through 5 independent thinking styles (Contrarian, First Principles, Expansionist, Outsider, Executor) before touching production code.
+description: Multi-perspective LLM Council and Ask-Matt orchestration protocol for autonomous coding agents. Use for pre-execution architectural decisions, high-risk bug triage, pressure-testing plans through 5 independent thinking styles (Contrarian, First Principles, Expansionist, Outsider, Executor), and translating verdicts into domain-specialist multi-agent DAG tickets for supervised MinusCorrect execution.
 ---
 
-# MinusCorrect Council Skill
+# MinusCorrect Council & Ask-Matt Orchestrator Skill
 
-A structured pre-execution deliberation protocol for autonomous coding agents. When facing architectural trade-offs, complex bug fixes, or high-risk refactors, running a council deliberation prevents the single-model cognitive tunnel-vision that leads to burned iteration budgets.
+A complete end-to-end autonomous engineering protocol combining **Andrej Karpathy's multi-perspective deliberation** with **Matt Pocock's Ask-Matt execution flow** (`/ask-matt`: Idea -> Spec -> Tracer-Bullet Tickets -> Domain Specialists -> Supervised TDD Implementation -> Review).
+
+When facing architectural decisions, production crash triage, or complex refactors, this skill prevents cognitive tunnel-vision and orchestrates multi-agent implementation under MinusCorrect's supervised runtime containment.
+
+---
 
 ## When to Activate
 
 - Triage of high-severity production incidents (`INCIDENT-RCA`)
 - Architectural decisions where being wrong breaks system invariants
 - Complex refactors with unknown blast radius
-- Pre-execution review of patches before committing to the 4-iteration supervisor loop
+- Pre-execution plan pressure-testing before touching production code
+- Coordinating multi-agent swarms with domain-specialist roles
 
-## The Five Thinking Lenses
+---
+
+## Phase 1: The Five Council Thinking Lenses
 
 1. **The Contrarian**: Actively looks for what will break, regressions, AST blast-radius hazards, and unintended side-effects.
 2. **The First Principles Thinker**: Strips away surface symptoms; asks what core invariant is being violated.
@@ -22,7 +29,9 @@ A structured pre-execution deliberation protocol for autonomous coding agents. W
 4. **The Outsider**: Provides zero-context sanity checks; catches over-engineering, buzzwords, and developer ergonomics traps.
 5. **The Executor**: Cuts scope; formulates the minimal, surgical Monday-morning patch plan.
 
-## The Deliberation Workflow
+---
+
+## Phase 2: Deliberation & Peer-Review Workflow
 
 ```
 [Agent Query / Incident Triage]
@@ -45,14 +54,47 @@ A structured pre-execution deliberation protocol for autonomous coding agents. W
 | Step 3: Chairman Synthesis                            |
 | (Agreements, Clashes, Caught Blind Spots, Verdict,     |
 |  The One Thing to Do First)                           |
++---------------------------+---------------------------+
+                            |
+                            v
++-------------------------------------------------------+
+| Step 4: Ask-Matt Execution Plan (Spec to Tickets DAG) |
 +-------------------------------------------------------+
 ```
 
-## Integrating with MinusCorrect Supervisor
+---
 
-Once the Council yields **The One Thing to Do First**, the agent executes the minimal patch under MinusCorrect's 4-iteration supervisor:
+## Phase 3: Ask-Matt Execution Plan (`/ask-matt`)
+
+When the decision requires building, refactoring, or remediation, the Chairman synthesis automatically generates an actionable Ask-Matt Execution Plan:
+
+1. **Architectural Specification (`/to-spec`)**:
+   - Core domain invariants, data contracts, and non-negotiables.
+   - Declares explicit **Protected Boundaries** (files that MUST NOT be touched or deleted, such as `tests/golden/`, past council transcripts, and working modules).
+2. **Tracer-Bullet Tickets (`/to-tickets`)**:
+   - A dependency DAG of self-contained tickets with declared blocking edges (prerequisites).
+   - Every ticket declares its `Target Files (In-Scope)` and `Protected Boundaries (Out-of-Scope)`.
+3. **Domain Specialist Multi-Agent Mapping**:
+   - For each ticket, assigns an explicit domain expert persona (e.g., *Distributed Systems Engineer*, *Security & Policy Auditor*, *Process Isolation SRE*, *TDD & Verification Lead*).
+   - Enforces domain-specific invariants rather than generic prompts.
+4. **TDD Verification Criteria (`/tdd`)**:
+   - Concrete test commands or boundary assertions to verify before committing.
+
+---
+
+## Phase 4: Supervised MinusCorrect Execution
+
+Each unblocked domain-specialist ticket is executed under the **MinusCorrect Supervisor**:
 
 ```bash
-# Supervised execution of the council's minimal test fix
-minuscorrect run --session-id council-triage -- pytest tests/staging/
+# Supervised execution of the specialist's test repair inside an ephemeral worktree
+minuscorrect run --worktree --isolate-env --timeout 180.0 -- pytest tests/staging/
 ```
+
+**What MinusCorrect Enforces During Execution:**
+- **4-Iteration Ceiling:** Prevents runaway agent loops.
+- **Volatile Error Hashing:** Deterministic error signature tracking.
+- **Ephemeral Git Worktree:** Isolates test execution from the main working tree.
+- **Credential Sandboxing (`--isolate-env`):** Strips ambient secrets (`AWS_*`, `GITHUB_TOKEN`).
+- **Atomic Rollback:** Discards bad agent diffs on failure without touching developer configuration files.
+- **Systemic Integrity Gate:** Pre-commit verifier (`minuscorrect verify --fix --strict`) checks contracts before completion.
