@@ -61,9 +61,29 @@ def build_parser() -> argparse.ArgumentParser:
     patch_parser.add_argument("--check-only", action="store_true", help="Perform dry-run blast radius check without applying")
 
     # Command: audit
-    audit_parser = subparsers.add_parser("audit", help="Ingest findings.json from cloudflare/security-audit-skill")
-    audit_parser.add_argument("findings_file", nargs="?", default="findings.json", help="Path to findings.json (default: findings.json)")
+    audit_parser = subparsers.add_parser("audit", help="Run 10-domain pre-launch operational security audit or ingest findings.json")
+    audit_parser.add_argument("findings_file", nargs="?", default=None, help="Path to findings.json (optional when using --pre-launch)")
+    audit_parser.add_argument("--pre-launch", action="store_true", help="Run 10-domain pre-launch operational and security audit for AI-generated systems")
+    audit_parser.add_argument("--target-dir", default=None, help="Target directory for pre-launch audit (default: current workspace)")
+    audit_parser.add_argument("--json", action="store_true", help="Output audit results in JSON format")
     audit_parser.add_argument("--output-dir", default="tests/staging", help="Output directory for staged contracts (default: tests/staging)")
+
+    # Command: spec
+    spec_parser = subparsers.add_parser("spec", help="Scaffold and manage project specifications (PRD, TRD, Refero DESIGN, APPFLOW, SCHEMA with RLS, Ask-Matt PLAN)")
+    spec_subparsers = spec_parser.add_subparsers(dest="spec_action")
+
+    spec_init = spec_subparsers.add_parser("init", help="Scaffold full blueprint specification suite into a directory")
+    spec_init.add_argument("--dir", dest="output_dir", default="spec", help="Target directory for specification files (default: spec)")
+    spec_init.add_argument("--name", dest="project_name", default="Enterprise Application", help="Project name")
+    spec_init.add_argument("--desc", dest="description", default="High-velocity enterprise application", help="Project description")
+    spec_init.add_argument("--force", action="store_true", help="Overwrite existing specification files")
+
+    spec_gen = spec_subparsers.add_parser("generate", help="Generate a specific spec artifact")
+    spec_gen.add_argument("artifact", choices=["prd", "trd", "design", "appflow", "schema", "plan", "all"], help="Specific artifact to generate")
+    spec_gen.add_argument("--dir", dest="output_dir", default="spec", help="Target directory (default: spec)")
+    spec_gen.add_argument("--name", dest="project_name", default="Enterprise Application", help="Project name")
+    spec_gen.add_argument("--desc", dest="description", default="High-velocity enterprise application", help="Project description")
+    spec_gen.add_argument("--force", action="store_true", help="Overwrite existing specification files")
 
     # Command: pr
     pr_parser = subparsers.add_parser("pr", help="Generate Draft PR proposal and decouple autonomous fixes from main")
@@ -90,6 +110,43 @@ def build_parser() -> argparse.ArgumentParser:
     ask_matt_parser = subparsers.add_parser("ask-matt", help="Generate Matt Pocock Spec-to-Tickets DAG execution plan")
     ask_matt_parser.add_argument("idea", nargs="?", default=None, help="Feature request or bug report to decompose")
     ask_matt_parser.add_argument("--json", action="store_true", help="Output tickets schema in JSON")
+    ask_matt_parser.add_argument("--save", action="store_true", help="Save generated tickets directly to .minus/tickets/open/")
+
+    # Command: ticket
+    ticket_parser = subparsers.add_parser("ticket", help="Manage .minus/ second-brain tickets and lifecycle states")
+    ticket_subparsers = ticket_parser.add_subparsers(dest="ticket_action")
+
+    ticket_list = ticket_subparsers.add_parser("list", help="List tickets in second-brain store")
+    ticket_list.add_argument("--status", choices=["open", "completed", "all"], default="all", help="Filter by ticket status (default: all)")
+    ticket_list.add_argument("--json", action="store_true", help="Output tickets in JSON format")
+
+    ticket_create = ticket_subparsers.add_parser("create", help="Create a new ticket in .minus/tickets/open/")
+    ticket_create.add_argument("-t", "--title", required=True, help="Ticket title")
+    ticket_create.add_argument("--role", default="Process Isolation SRE", help="Assigned domain specialist role")
+    ticket_create.add_argument("--objective", default="", help="Specific behavioral objective")
+    ticket_create.add_argument("--target", action="append", dest="target_files", help="In-scope target files")
+    ticket_create.add_argument("--verification", default="minuscorrect verify --fix --strict", help="Verification command")
+
+    ticket_view = ticket_subparsers.add_parser("view", help="View ticket details and frontmatter")
+    ticket_view.add_argument("ticket_id", help="Ticket ID (e.g. T-001)")
+
+    ticket_close = ticket_subparsers.add_parser("close", help="Close ticket and record execution receipt")
+    ticket_close.add_argument("ticket_id", help="Ticket ID (e.g. T-001)")
+    ticket_close.add_argument("--commit", default="HEAD", help="Commit SHA verified by this ticket")
+    ticket_close.add_argument("--test-cmd", default="minuscorrect verify", help="Test command executed")
+    ticket_close.add_argument("--exit-code", type=int, default=0, help="Test exit code")
+    ticket_close.add_argument("--specialist", default="", help="Specialist signing off on ticket")
+
+    # Command: route
+    route_parser = subparsers.add_parser("route", help="Smart Intent Router: classify request into optimal MinusCorrect route")
+    route_parser.add_argument("query", help="Natural language request or telemetry text")
+    route_parser.add_argument("--json", action="store_true", help="Output routing decision in JSON format")
+
+    # Command: anti-cheat
+    anti_cheat_parser = subparsers.add_parser("anti-cheat", help="Audit repository against benchmark overfitting, hardcoded bypasses, and tautologies")
+    anti_cheat_parser.add_argument("--source-dir", default="minuscorrect", help="Source code directory (default: minuscorrect)")
+    anti_cheat_parser.add_argument("--test-dir", default="tests", help="Tests directory (default: tests)")
+    anti_cheat_parser.add_argument("--json", action="store_true", help="Output audit report in JSON format")
 
     # Command: plugin
     plugin_parser = subparsers.add_parser("plugin", help="Manage MinusCorrect agent integrations (Antigravity CLI, Claude Code)")
@@ -294,15 +351,27 @@ def handle_patch(args: argparse.Namespace) -> int:
 
 
 def handle_audit(args: argparse.Namespace) -> int:
+    if getattr(args, "pre_launch", False):
+        from minuscorrect.audit import run_pre_launch_audit
+        target_dir = Path(args.target_dir) if getattr(args, "target_dir", None) else Path.cwd()
+        report = run_pre_launch_audit(target_dir=target_dir)
+        if getattr(args, "json", False):
+            print(report.to_json())
+        else:
+            print(report.format_text())
+        return 1 if report.blocks_launch else 0
+
     from minuscorrect.audit import (
         generate_security_audit_summary,
         generate_staged_security_test,
         parse_audit_findings,
     )
 
-    audit_file = Path(args.findings_file)
+    findings_path = getattr(args, "findings_file", None) or "findings.json"
+    audit_file = Path(findings_path)
     if not audit_file.exists():
         print(f"[ERROR] Audit findings file not found: {audit_file}", file=sys.stderr)
+        print("[TIP] To execute the 10-domain pre-launch operational security audit, run: minuscorrect audit --pre-launch", file=sys.stderr)
         return 1
 
     raw_json = audit_file.read_text(encoding="utf-8", errors="replace")
@@ -320,6 +389,57 @@ def handle_audit(args: argparse.Namespace) -> int:
     print(f"[SUCCESS] Audit summary generated: {summary_path.resolve()}")
 
     return 0
+
+
+def handle_spec(args: argparse.Namespace) -> int:
+    from minuscorrect.spec import (
+        generate_prd,
+        generate_trd,
+        generate_refero_design,
+        generate_appflow,
+        generate_schema,
+        generate_plan,
+        scaffold_spec_suite,
+    )
+
+    action = getattr(args, "spec_action", "init") or "init"
+    out_dir = Path(getattr(args, "output_dir", "spec") or "spec")
+    name = getattr(args, "project_name", "Enterprise Application") or "Enterprise Application"
+    desc = getattr(args, "description", "") or ""
+    force = getattr(args, "force", False)
+
+    if action == "init" or (action == "generate" and getattr(args, "artifact", "all") == "all"):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        results = scaffold_spec_suite(output_dir=out_dir, project_name=name, description=desc)
+        print(f"[SUCCESS] Scaffolded {len(results)} specification files in {out_dir.resolve()}:")
+        for filename, path in results.items():
+            print(f"  - {filename} ({path.stat().st_size} bytes)")
+        return 0
+
+    artifact = getattr(args, "artifact", "all")
+    mapping = {
+        "prd": ("PRD.md", lambda: generate_prd(name, desc)),
+        "trd": ("TRD.md", lambda: generate_trd(name, desc)),
+        "design": ("DESIGN.md", lambda: generate_refero_design(name)),
+        "appflow": ("APPFLOW.md", lambda: generate_appflow(name)),
+        "schema": ("SCHEMA.sql", lambda: generate_schema(name)),
+        "plan": ("PLAN.md", lambda: generate_plan(name, desc)),
+    }
+
+    if artifact in mapping:
+        filename, gen_fn = mapping[artifact]
+        out_dir.mkdir(parents=True, exist_ok=True)
+        target = out_dir / filename
+        if target.exists() and not force:
+            print(f"[INFO] {target} already exists. Skipping (use --force to overwrite).")
+            return 0
+        content = gen_fn()
+        target.write_text(content, encoding="utf-8")
+        print(f"[SUCCESS] Generated {target.resolve()} ({len(content.encode('utf-8'))} bytes)")
+        return 0
+
+    print(f"[ERROR] Unknown spec action or artifact: {artifact}", file=sys.stderr)
+    return 1
 
 
 def main(argv: List[str] = None) -> int:
@@ -340,6 +460,8 @@ def main(argv: List[str] = None) -> int:
         return handle_patch(args)
     elif args.command == "audit":
         return handle_audit(args)
+    elif args.command == "spec":
+        return handle_spec(args)
     elif args.command == "pr":
         return handle_pr(args)
     elif args.command == "mcp":
@@ -354,6 +476,12 @@ def main(argv: List[str] = None) -> int:
         return handle_plugin(args)
     elif args.command == "harness":
         return handle_harness(args)
+    elif args.command == "ticket":
+        return handle_ticket(args)
+    elif args.command == "route":
+        return handle_route(args)
+    elif args.command == "anti-cheat":
+        return handle_anti_cheat(args)
     else:
         parser.print_help()
         return 0
@@ -378,9 +506,102 @@ def handle_council(args: argparse.Namespace) -> int:
 
 def handle_ask_matt(args: argparse.Namespace) -> int:
     from minuscorrect.orchestrator import generate_ask_matt_plan
-    output = generate_ask_matt_plan(idea=args.idea, as_json=getattr(args, "json", False))
+    output = generate_ask_matt_plan(
+        idea=args.idea,
+        as_json=getattr(args, "json", False),
+        save_to_store=getattr(args, "save", False),
+    )
     print(output)
+    if getattr(args, "save", False):
+        print("[SUCCESS] Tickets saved directly into .minus/tickets/open/ and registered in index.json")
     return 0
+
+
+def handle_ticket(args: argparse.Namespace) -> int:
+    from minuscorrect.store import MinusStore
+    store = MinusStore()
+    action = getattr(args, "ticket_action", "list") or "list"
+
+    if action == "list":
+        status_filter = None if args.status == "all" else args.status
+        tickets = store.list_tickets(status=status_filter)
+        if getattr(args, "json", False):
+            print(json.dumps(tickets, indent=2))
+        else:
+            if not tickets:
+                print(f"[INFO] No tickets found matching status '{args.status}'.")
+            else:
+                print(f"MinusCorrect Second-Brain Tickets ({len(tickets)} total):")
+                print(f"{'ID':<10} {'STATUS':<12} {'ROLE':<30} {'TITLE'}")
+                print("-" * 78)
+                for t in tickets:
+                    print(f"{t.get('id', ''):<10} {t.get('status', '').upper():<12} {t.get('role', ''):<30} {t.get('title', '')}")
+        return 0
+
+    elif action == "create":
+        ticket = store.create_ticket(
+            title=args.title,
+            role=args.role,
+            objective=args.objective or args.title,
+            target_files=args.target_files,
+            verification=args.verification,
+        )
+        print(f"[SUCCESS] Created ticket {ticket.id} in .minus/tickets/open/{ticket.id}.md")
+        return 0
+
+    elif action == "view":
+        ticket = store.get_ticket(args.ticket_id)
+        if not ticket:
+            print(f"[ERROR] Ticket '{args.ticket_id}' not found.", file=sys.stderr)
+            return 1
+        print(ticket.to_markdown())
+        return 0
+
+    elif action == "close":
+        try:
+            ticket = store.close_ticket(
+                ticket_id=args.ticket_id,
+                commit_sha=args.commit,
+                test_command=args.test_cmd,
+                exit_code=args.exit_code,
+                specialist=args.specialist,
+            )
+            print(f"[SUCCESS] Closed ticket {ticket.id}. Transitioned to .minus/tickets/completed/{ticket.id}.md")
+            print(f"          Recorded receipt: Commit {args.commit}, Exit Code {args.exit_code}")
+            return 0
+        except FileNotFoundError as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            return 1
+
+    print(f"[ERROR] Unknown ticket action: {action}", file=sys.stderr)
+    return 1
+
+
+def handle_route(args: argparse.Namespace) -> int:
+    from minuscorrect.router import route_intent
+    decision = route_intent(args.query)
+    if getattr(args, "json", False):
+        print(decision.to_json())
+    else:
+        print(decision.format_text())
+    return 0
+
+
+def handle_anti_cheat(args: argparse.Namespace) -> int:
+    from minuscorrect.anti_cheat import audit_against_benchmark_cheats
+    src_dir = Path(args.source_dir)
+    test_dir = Path(args.test_dir)
+    if not src_dir.exists():
+        src_dir = Path.cwd() / "minuscorrect"
+    if not test_dir.exists():
+        test_dir = Path.cwd() / "tests"
+
+    report = audit_against_benchmark_cheats(src_dir, test_dir)
+    if getattr(args, "json", False):
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(report.format_text())
+    return 0 if report.passed else 1
 
 
 def handle_plugin(args: argparse.Namespace) -> int:

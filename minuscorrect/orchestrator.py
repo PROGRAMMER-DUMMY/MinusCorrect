@@ -158,11 +158,83 @@ def evaluate_council_consensus(
     }
 
 
-def generate_ask_matt_plan(idea: Optional[str] = None, as_json: bool = False) -> str:
+def generate_ask_matt_plan(
+    idea: Optional[str] = None,
+    as_json: bool = False,
+    save_to_store: bool = False,
+    store_root: Optional[Path] = None,
+) -> str:
     """
     Generate an Ask-Matt Spec-to-Tickets DAG implementation plan.
+    Attaches domain specialist system prompts and optionally ingests tickets into .minus/ store.
+    # verifies: tests/unit/test_orchestrator.py
     """
+    from minuscorrect.specialists import build_specialist_prompt
+
     subject = idea or "Defect repair / Feature implementation"
+    raw_tickets = [
+        {
+            "id": "TICKET-01",
+            "title": "Contract Definition & Test Staging",
+            "role": "Distributed Systems Engineer",
+            "objective": "Define interface contracts and create staged acceptance tests.",
+            "target_files": ["tests/staging/test_contract.py"],
+            "protected_boundaries": ["tests/golden/*"],
+            "blocked_by": [],
+            "blocks": ["TICKET-02"],
+            "verification": "minuscorrect run --worktree -- pytest tests/staging/",
+        },
+        {
+            "id": "TICKET-02",
+            "title": "Surgical Implementation & Sandboxed Verification",
+            "role": "Process Isolation SRE",
+            "objective": "Implement minimal solution within single target file blast radius.",
+            "target_files": ["src/implementation.py"],
+            "protected_boundaries": ["tests/golden/*", "pyproject.toml"],
+            "blocked_by": ["TICKET-01"],
+            "blocks": ["TICKET-03"],
+            "verification": "minuscorrect run --worktree --isolate-env -- pytest tests/staging/",
+        },
+        {
+            "id": "TICKET-03",
+            "title": "Pre-Commit Integrity Audit & Clean-up",
+            "role": "TDD & Verification Lead",
+            "objective": "Run pre-commit systemic verifier, strip debug scaffolding, and export PR proposal.",
+            "target_files": ["src/implementation.py", "tests/staging/test_contract.py"],
+            "protected_boundaries": ["tests/golden/*"],
+            "blocked_by": ["TICKET-02"],
+            "blocks": [],
+            "verification": "minuscorrect verify --fix --strict && minuscorrect pr",
+        },
+    ]
+
+    for t in raw_tickets:
+        t["specialist_prompt"] = build_specialist_prompt(
+            ticket_id=t["id"],
+            title=t["title"],
+            role=t["role"],
+            objective=t["objective"],
+            target_files=t.get("target_files"),
+            protected_boundaries=t.get("protected_boundaries"),
+            verification=t["verification"],
+        )
+
+    if save_to_store:
+        from minuscorrect.store import MinusStore
+        store = MinusStore(root_dir=store_root)
+        for t in raw_tickets:
+            store.create_ticket(
+                ticket_id=t["id"],
+                title=t["title"],
+                role=t["role"],
+                objective=t["objective"],
+                target_files=t.get("target_files"),
+                protected_boundaries=t.get("protected_boundaries"),
+                blocked_by=t["blocked_by"],
+                blocks=t["blocks"],
+                verification=t["verification"],
+            )
+
     data = {
         "target": subject,
         "spec": {
@@ -173,35 +245,7 @@ def generate_ask_matt_plan(idea: Optional[str] = None, as_json: bool = False) ->
                 "Production modules outside targeted blast radius",
             ],
         },
-        "tracer_bullet_tickets": [
-            {
-                "id": "TICKET-01",
-                "title": "Contract Definition & Test Staging",
-                "role": "Distributed Systems Engineer",
-                "objective": "Define interface contracts and create staged acceptance tests.",
-                "blocked_by": [],
-                "blocks": ["TICKET-02"],
-                "verification": "minuscorrect run --worktree -- pytest tests/staging/",
-            },
-            {
-                "id": "TICKET-02",
-                "title": "Surgical Implementation & Sandboxed Verification",
-                "role": "Process Isolation SRE",
-                "objective": "Implement minimal solution within single target file blast radius.",
-                "blocked_by": ["TICKET-01"],
-                "blocks": ["TICKET-03"],
-                "verification": "minuscorrect run --worktree --isolate-env -- pytest tests/staging/",
-            },
-            {
-                "id": "TICKET-03",
-                "title": "Pre-Commit Integrity Audit & Clean-up",
-                "role": "TDD & Verification Lead",
-                "objective": "Run pre-commit systemic verifier, strip debug scaffolding, and export PR proposal.",
-                "blocked_by": ["TICKET-02"],
-                "blocks": [],
-                "verification": "minuscorrect verify --fix --strict && minuscorrect pr",
-            },
-        ],
+        "tracer_bullet_tickets": raw_tickets,
     }
 
     if as_json:
