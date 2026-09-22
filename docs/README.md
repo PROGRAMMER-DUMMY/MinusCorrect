@@ -39,3 +39,20 @@ Welcome to the documentation suite for **MinusCorrect**, the systemic integrity 
    - Host-level protection via `.github/CODEOWNERS`
    - Out-of-band GitHub Actions CI (`.github/workflows/integrity.yml`)
    - Mitigating the Watcher Paradox and shell-level bypasses
+
+7. [Smart Intent Router](quickstart.md#4-smart-intent-router-minuscorrect-route)
+   - Natural language classification into deterministic operational pipelines
+   - Autonomous routing to Council, Ask-Matt, Incident, Spec, or Audit
+
+8. [Second-Brain Store & Task Lifecycles (`.minus/`)](quickstart.md#5-second-brain-ticket-lifecycle-store--minus)
+   - Persistent task management: `tickets/open/` -> `tickets/completed/`
+   - Cryptographic machine receipts with commit SHAs and exit codes
+   - Incident telemetry and post-mortem indexing
+
+9. [10-Domain Pre-Launch Operational & Security Audit](quickstart.md#7-10-domain-pre-launch-security--operational-audit-minuscorrect-audit---pre-launch)
+   - Automated detection of NEXT_PUBLIC_ leaks, missing RLS, and BOLA/IDOR
+   - Webhook HMAC verification, unindexed foreign keys, and PII log scrubbing
+
+10. [Anti-Benchmark-Maxxing & Anti-Cheating Guardian](quickstart.md#8-anti-benchmark-maxxing--anti-cheating-guardian-minuscorrect-anti-cheat)
+    - AST detection of hardcoded test fixture branch bypasses
+    - Tautological assertion detection and exception swallowing audits

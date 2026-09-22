@@ -115,7 +115,55 @@ minuscorrect status --session-id issue-402
 minuscorrect reset --session-id issue-402
 ```
 
-### 4. Active Git Pre-Commit Hook & Host-Level Protection
+### 4. Smart Intent Router (`minuscorrect route`)
+Eliminates tool micromanagement by automatically classifying queries, crash traces, or feature ideas into the optimal MinusCorrect execution pipeline:
+```bash
+minuscorrect route "We are seeing high memory leaks on Redis workers and need an architectural review"
+```
+Outputs recommended command, confidence score, and extracted entities.
+
+### 5. Second-Brain Ticket Lifecycle Store (`.minus/`)
+Maintains an embedded, local-first task and incident ledger with atomic state transitions and cryptographic commit SHA receipts:
+```bash
+# List all active or completed tickets
+minuscorrect ticket list --status open
+
+# Create a domain-specialist ticket
+minuscorrect ticket create -t "Enforce RLS tenant policies" --role "Security & Policy Auditor"
+
+# Close ticket and record machine execution receipt
+minuscorrect ticket close T-001 --commit 9a8b7c6d --test-cmd "pytest tests/unit/" --exit-code 0
+```
+
+### 6. Full-Stack Blueprint & Spec Scaffolding (`minuscorrect spec`)
+Generates comprehensive PRD, TRD, Refero-grade DESIGN (Tailwind v4 tokens, CSS variables, spring curves), Mermaid APPFLOW, PostgreSQL SCHEMA with mandatory RLS on all tables, and Ask-Matt PLAN:
+```bash
+minuscorrect spec init --dir spec --name "EnterpriseSaaS"
+```
+
+### 7. 10-Domain Pre-Launch Security & Operational Audit (`minuscorrect audit --pre-launch`)
+Audits projects for critical AI-generated failure modes:
+- Domain 1: Client Bundle Secret Leakage (`NEXT_PUBLIC_` traps)
+- Domain 2: Missing Supabase Row Level Security & Unsecured Views
+- Domain 3: Broken Object-Level Authorization (BOLA/IDOR) & Next.js Server Actions
+- Domain 4: SMS Toll Fraud & Velocity / Rate Limiting
+- Domain 5: Webhook Signature Verification (raw body cryptographic HMAC) & Idempotency
+- Domain 6: Disaster Recovery & Verified Backup Restoration Drills
+- Domain 7: Database Foreign Key Indexing (every `REFERENCES` column indexed)
+- Domain 8: Staging `robots.txt` `Disallow: /` leaks into production
+- Domain 9: Plaintext Credential / PII Logging scrubbing
+- Domain 10: Third-Party Integrations & Circuit Breakers (3.0s timeouts)
+```bash
+minuscorrect audit --pre-launch
+```
+
+### 8. Anti-Benchmark-Maxxing & Anti-Cheating Guardian (`minuscorrect anti-cheat`)
+Prevents LLMs from overfitting to test fixtures, generating tautological assertions (`assert True`), or using hardcoded test bypass branches:
+```bash
+minuscorrect anti-cheat --source-dir minuscorrect --test-dir tests
+```
+
+### 9. Active Git Pre-Commit Hook & Host-Level Protection
 * **Local Pre-Commit Hook:** Active at `.git/hooks/pre-commit`. Runs automatically on every `git commit`.
 * **Git Host CODEOWNERS:** Hard-locked via `.github/CODEOWNERS`. Unauthorized agent shell commits cannot modify `tests/golden/`.
 * **Standard Pre-Commit Package:** Any external project can adopt MinusCorrect in 60 seconds by adding it to `.pre-commit-config.yaml`:
@@ -132,7 +180,7 @@ minuscorrect reset --session-id issue-402
 ALLOW_GOLDEN_EDIT=1 git commit -m "chore: update golden contract"
 ```
 
-### 5. Prompting Agents (Claude Code, Agy, Codex, Cursor)
+### 10. Prompting Agents (Claude Code, Agy, Codex, Cursor)
 When dispatching an autonomous agent:
 > *"Implement the solution to pass `tests/golden/test_billing.py`. Note: `tests/golden/` is STRICTLY READ-ONLY. Mutate only `src/billing.py`. Adhere to `AGENTS.md`."*
 
