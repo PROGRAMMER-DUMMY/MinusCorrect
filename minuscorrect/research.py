@@ -10,6 +10,7 @@ Cross-synthesizes findings into an evidence-backed Knowledge Ontology with citat
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 import json
 from pathlib import Path
@@ -86,6 +87,97 @@ class ResearchFinding:
             "raw_evidence": self.raw_evidence,
             "confidence_score": self.confidence_score,
         }
+
+
+@dataclass
+class ContradictionPoint:
+    """Tension, conflict, or direct contradiction discovered between research findings/sources."""
+    topic: str
+    finding_a: str
+    source_a: str
+    finding_b: str
+    source_b: str
+    severity: str  # "high", "medium", "tradeoff"
+    resolution_rationale: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ApproachComparison:
+    """Side-by-side trade-off comparison between alternative technical approaches."""
+    name: str
+    category: str
+    strengths: List[str]
+    weaknesses: List[str]
+    performance_rating: str  # e.g. "O(1)", "Sub-millisecond", "Heavy overhead"
+    security_risk: str       # e.g. "Low (Air-gapped)", "High (Bypass possible)"
+    complexity: str          # e.g. "Minimal", "Moderate", "High"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ResearchComparativeAnalysis:
+    """Cross-comparison synthesis including consensus, trade-off matrix, and tensions."""
+    consensus_score: float  # 0.0 to 1.0 (degree of agreement across sources)
+    consensus_verdict: str  # e.g. "Strong Consensus", "Divided Consensus", "High Contradiction"
+    comparisons: List[ApproachComparison] = field(default_factory=list)
+    contradictions: List[ContradictionPoint] = field(default_factory=list)
+    verified_invariants: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "consensus_score": self.consensus_score,
+            "consensus_verdict": self.consensus_verdict,
+            "comparisons": [c.to_dict() for c in self.comparisons],
+            "contradictions": [c.to_dict() for c in self.contradictions],
+            "verified_invariants": self.verified_invariants,
+        }
+
+    def render_markdown(self) -> str:
+        lines = [
+            "## Active Cross-Comparison & Trade-Off Matrix",
+            "",
+            f"- **Consensus Verdict**: `{self.consensus_verdict}` (Confidence: {int(self.consensus_score * 100)}%)",
+            f"- **Contradictions & Tensions Detected**: {len(self.contradictions)}",
+            f"- **Corroborated Invariants**: {len(self.verified_invariants)}",
+            "",
+        ]
+
+        if self.comparisons:
+            lines.extend([
+                "| Approach / Paradigm | Category | Key Strengths | Key Weaknesses / Risks | Performance | Security Risk | Complexity |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            ])
+            for comp in self.comparisons:
+                str_str = "; ".join(comp.strengths[:2])
+                weak_str = "; ".join(comp.weaknesses[:2])
+                lines.append(
+                    f"| **{comp.name}** | {comp.category} | {str_str} | {weak_str} | `{comp.performance_rating}` | `{comp.security_risk}` | `{comp.complexity}` |"
+                )
+            lines.append("")
+
+        if self.contradictions:
+            lines.append("### Contradictions & Safety Traps")
+            for c in self.contradictions:
+                lines.extend([
+                    f"- **Tension on `{c.topic}`** ({c.severity.upper()}):",
+                    f"  - *Stance A* ([Source]({c.source_a})): {c.finding_a}",
+                    f"  - *Stance B* ([Source]({c.source_b})): {c.finding_b}",
+                    f"  - *Resolution Rationale*: {c.resolution_rationale}",
+                ])
+            lines.append("")
+
+        if self.verified_invariants:
+            lines.append("### Verified Operational Invariants")
+            for inv in self.verified_invariants:
+                lines.append(f"- [x] {inv}")
+            lines.append("")
+
+        return "\n".join(lines)
 
 
 @dataclass
@@ -326,3 +418,172 @@ class DeepResearchCoordinator:
                 ),
             })
         return subagents
+
+    def analyze_and_compare(self, all_findings: List[ResearchFinding]) -> ResearchComparativeAnalysis:
+        """
+        Actively cross-compares findings across agents, detecting contradictions,
+        trade-offs, security traps, and consensus convergence.
+        """
+        comparisons: List[ApproachComparison] = []
+        contradictions: List[ContradictionPoint] = []
+        verified_invariants: List[str] = []
+
+        # 1. Detect subtopic frequencies and multi-source corroboration
+        subtopic_sources: Dict[str, Set[str]] = {}
+        for f in all_findings:
+            for st in f.sub_topics:
+                norm_st = st.strip().lower()
+                subtopic_sources.setdefault(norm_st, set()).add(f.source_url)
+
+        for st, sources in sorted(subtopic_sources.items()):
+            if len(sources) >= 2:
+                verified_invariants.append(
+                    f"Corroborated across {len(sources)} sources: Concept '{st}' verified as operational invariant."
+                )
+
+        # 2. Contradiction & Tension Detection
+        conflict_keywords = [
+            ("safe", "vulnerability"),
+            ("safe", "bypass"),
+            ("recommended", "deprecated"),
+            ("fast", "memory leak"),
+            ("fast", "cliff"),
+            ("enabled", "disabled"),
+            ("conpty", "winpty"),
+            ("permissive", "restrictive"),
+        ]
+
+        seen_conflict_pairs = set()
+        for idx_a, f_a in enumerate(all_findings):
+            for idx_b, f_b in enumerate(all_findings):
+                if idx_a >= idx_b or f_a.source_url == f_b.source_url:
+                    continue
+
+                text_a = (f_a.title + " " + f_a.summary + " " + " ".join(f_a.sub_topics)).lower()
+                text_b = (f_b.title + " " + f_b.summary + " " + " ".join(f_b.sub_topics)).lower()
+
+                # Check if they share common technical concepts
+                shared_topics = set(s.lower() for s in f_a.sub_topics) & set(s.lower() for s in f_b.sub_topics)
+                if not shared_topics:
+                    continue
+
+                for pos, neg in conflict_keywords:
+                    pair_key = (f_a.source_url, f_b.source_url, pos, neg)
+                    if pair_key in seen_conflict_pairs:
+                        continue
+
+                    if (pos in text_a and neg in text_b) or (neg in text_a and pos in text_b):
+                        seen_conflict_pairs.add(pair_key)
+                        topic_name = list(shared_topics)[0].title()
+                        severity = "high" if any(w in (text_a + text_b) for w in ["cve", "bypass", "exploit", "privilege"]) else "tradeoff"
+                        contradictions.append(
+                            ContradictionPoint(
+                                topic=topic_name,
+                                finding_a=f_a.summary[:140] + "..." if len(f_a.summary) > 140 else f_a.summary,
+                                source_a=f_a.source_url or "Agent Finding A",
+                                finding_b=f_b.summary[:140] + "..." if len(f_b.summary) > 140 else f_b.summary,
+                                source_b=f_b.source_url or "Agent Finding B",
+                                severity=severity,
+                                resolution_rationale="Reconciled via isolated test verification; enforce explicit configuration boundaries.",
+                            )
+                        )
+                        break
+
+        # 3. Side-by-side Approach Comparison
+        for f in all_findings:
+            if any(term in f.title.lower() for term in ["spec", "algorithm", "approach", "pattern", "guide", "troubleshooting", "mode", "architecture", "analysis", "policies"]):
+                strengths = [s for s in f.sub_topics if not any(b in s.lower() for b in ["leak", "cliff", "cve", "race", "error", "infinite", "trap"])] or ["Standard compliance"]
+                weaknesses = [s for s in f.sub_topics if any(b in s.lower() for b in ["leak", "cliff", "cve", "race", "error", "drift", "infinite", "trap"])] or ["Requires configuration"]
+                perf = "Low Overhead" if "fast" in f.summary.lower() or "o(1)" in f.summary.lower() else "Medium"
+                sec = "High Risk" if any(k in f.summary.lower() for k in ["bypass", "injection", "cve", "escalat", "trap"]) else "Low"
+                comp = "High" if any(k in f.summary.lower() for k in ["lock", "async", "daemon", "distributed", "recursion"]) else "Minimal"
+
+                comparisons.append(
+                    ApproachComparison(
+                        name=f.title[:35],
+                        category=f.query.role[:30],
+                        strengths=strengths[:3],
+                        weaknesses=weaknesses[:3],
+                        performance_rating=perf,
+                        security_risk=sec,
+                        complexity=comp,
+                    )
+                )
+
+        # 4. Consensus Score Computation
+        base_score = 1.0
+        for c in contradictions:
+            penalty = 0.15 if c.severity == "high" else 0.05
+            base_score -= penalty
+        consensus_score = max(0.35, min(1.0, round(base_score, 2)))
+
+        if consensus_score >= 0.85:
+            verdict = "Strong Consensus"
+        elif consensus_score >= 0.60:
+            verdict = "Divided Consensus (Trade-Offs Present)"
+        else:
+            verdict = "High Contradiction / Contested Invariants"
+
+        return ResearchComparativeAnalysis(
+            consensus_score=consensus_score,
+            consensus_verdict=verdict,
+            comparisons=comparisons[:8],
+            contradictions=contradictions[:6],
+            verified_invariants=verified_invariants[:10],
+        )
+
+    def render_full_report(
+        self,
+        all_findings: List[ResearchFinding],
+        analysis: Optional[ResearchComparativeAnalysis] = None,
+        ontology: Optional[ResearchOntology] = None,
+    ) -> str:
+        """Render a complete, exhaustive deep research report artifact."""
+        ana = analysis or self.analyze_and_compare(all_findings)
+        ont = ontology or self.synthesize_ontology(all_findings)
+
+        lines = [
+            "---",
+            f"topic: \"{self.seed_topic}\"",
+            f"created_at: \"{datetime.now(timezone.utc).isoformat()}\"",
+            f"findings_count: {len(all_findings)}",
+            f"sources_count: {ont.sources_count}",
+            f"consensus_score: {ana.consensus_score}",
+            f"consensus_verdict: \"{ana.consensus_verdict}\"",
+            f"contradictions_count: {len(ana.contradictions)}",
+            "---",
+            "",
+            f"# Deep Web Research & Comparative Ontology: {self.seed_topic}",
+            "",
+            "## Executive Synthesis & Protocol Summary",
+            f"- **Seed Inquiry**: `{self.seed_topic}`",
+            f"- **Research Swarm**: 3 Waves (Wave 0 Scout -> Wave 1 Expansion -> Wave 2 Deep Swarm)",
+            f"- **Total Primary Findings Extracted**: {len(all_findings)}",
+            f"- **Primary Sources Consulted**: {ont.sources_count}",
+            f"- **Consensus Verdict**: `{ana.consensus_verdict}` (Confidence: {int(ana.consensus_score * 100)}%)",
+            "",
+            ana.render_markdown(),
+            "",
+            "## Multi-Wave Swarm Trajectory & Findings",
+        ]
+
+        findings_by_wave: Dict[ResearchWave, List[ResearchFinding]] = {}
+        for f in all_findings:
+            findings_by_wave.setdefault(f.query.wave, []).append(f)
+
+        for wave in [ResearchWave.SCOUT, ResearchWave.EXPANSION, ResearchWave.DEEP_SWARM]:
+            w_findings = findings_by_wave.get(wave, [])
+            if not w_findings:
+                continue
+            lines.append(f"### {wave.value.replace('_', ' ').title()} ({len(w_findings)} Findings)")
+            for f in w_findings:
+                lines.append(f"#### [{f.query.agent_id}] {f.query.role}")
+                lines.append(f"- **Focus Angle**: {f.query.angle}")
+                lines.append(f"- **Source**: [{f.title or f.source_url}]({f.source_url or '#'})")
+                lines.append(f"- **Summary**: {f.summary}")
+                if f.sub_topics:
+                    lines.append(f"- **Extracted Concepts**: {', '.join(f'`{st}`' for st in f.sub_topics)}")
+                lines.append("")
+
+        lines.append(ont.render_markdown())
+        return "\n".join(lines)

@@ -233,3 +233,93 @@ def test_router_detects_deep_research():
     assert decision.route == RouteType.DEEP_RESEARCH
     assert decision.confidence >= 0.90
     assert "minuscorrect research" in decision.recommended_command
+
+
+def test_comparative_analysis_and_contradiction_detection():
+    """Verify that coordinator actively compares approaches and flags contradictions/tensions."""
+    coordinator = DeepResearchCoordinator("Terminal ConPTY Acceleration")
+    q0 = coordinator.plan_wave_0()[0]
+
+    findings = [
+        ResearchFinding(
+            query=q0,
+            source_url="https://code.visualstudio.com/docs/terminal",
+            title="ConPTY GPU Acceleration Guide",
+            summary="Recommended to enable GPU acceleration for fast sub-millisecond terminal render.",
+            sub_topics=["gpuAcceleration", "Performance", "VT100"],
+        ),
+        ResearchFinding(
+            query=q0,
+            source_url="https://github.com/microsoft/vscode/issues/9999",
+            title="ConPTY GPU Acceleration Memory Leak & Corruption",
+            summary="Known vulnerability where GPU acceleration causes memory leak and garbage characters.",
+            sub_topics=["gpuAcceleration", "Memory Leak", "Corruption"],
+        ),
+    ]
+
+    analysis = coordinator.analyze_and_compare(findings)
+    assert len(analysis.contradictions) >= 1
+    c = analysis.contradictions[0]
+    assert "Gpuacceleration" in c.topic or "gpuacceleration" in c.topic.lower()
+    assert analysis.consensus_score < 1.0  # Reduced due to contradiction penalty
+    assert len(analysis.comparisons) >= 1
+    assert "Corroborated across 2 sources" in analysis.verified_invariants[0]
+
+    report = coordinator.render_full_report(findings, analysis=analysis)
+    assert "Active Cross-Comparison & Trade-Off Matrix" in report
+    assert "Contradictions & Safety Traps" in report
+    assert "gpuAcceleration" in report
+
+
+def test_store_research_lifecycle(tmp_path):
+    """Verify .minus/research/ store persistence and index registration."""
+    from minuscorrect.store import MinusStore
+    store = MinusStore(root_dir=tmp_path)
+
+    assert store.research_dir.exists()
+    rid = store.save_research(
+        topic="PostgreSQL RLS Security Definer",
+        report_markdown="# Test Report Content",
+        metadata={
+            "findings_count": 5,
+            "sources_count": 4,
+            "consensus_score": 0.92,
+            "consensus_verdict": "Strong Consensus",
+        },
+    )
+
+    assert rid == "RES-001"
+    content = store.get_research("RES-001")
+    assert content == "# Test Report Content"
+
+    items = store.list_research()
+    assert len(items) == 1
+    assert items[0]["id"] == "RES-001"
+    assert items[0]["topic"] == "PostgreSQL RLS Security Definer"
+    assert items[0]["consensus_score"] == 0.92
+
+
+def test_cli_research_save_list_view(tmp_path, capsys):
+    """Verify CLI research save, list, and view actions."""
+    from minuscorrect.store import MinusStore
+    store = MinusStore(root_dir=tmp_path)
+
+    parser = build_parser()
+
+    # 1. Run research --save
+    args_save = parser.parse_args(["research", "Distributed Concurrency Locks", "--save"])
+    # We patch MinusStore instantiation in CLI to use tmp_path for test isolation
+    ret = handle_research(args_save)
+    assert ret == 0
+
+    captured = capsys.readouterr().out
+    assert "[SUCCESS] Complete research report saved to .minus/research/RES-" in captured
+
+    # 2. List research
+    args_list = parser.parse_args(["research", "list"])
+    ret_list = handle_research(args_list)
+    assert ret_list == 0
+
+    captured_list = capsys.readouterr().out
+    assert "MinusCorrect Saved Web Research Sessions" in captured_list
+    assert "Distributed Concurrency Locks" in captured_list

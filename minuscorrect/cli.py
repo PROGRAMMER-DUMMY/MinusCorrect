@@ -150,8 +150,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Command: research
     research_parser = subparsers.add_parser("research", help="Deep Web Research Swarm & Knowledge Ontology Protocol")
-    research_parser.add_argument("topic", help="Topic or technical architecture to research deeply")
+    research_parser.add_argument("topic", nargs="?", default=None, help="Topic or technical architecture to research deeply, or 'list'/'view'")
+    research_parser.add_argument("target_id", nargs="?", default=None, help="Target research session ID (e.g. RES-001) when viewing")
     research_parser.add_argument("--waves", type=int, default=3, choices=[1, 2, 3], help="Number of research waves to plan (default: 3)")
+    research_parser.add_argument("--save", action="store_true", help="Save complete research report and comparison matrix into .minus/research/")
     research_parser.add_argument("--json", action="store_true", help="Output research plan and agent specs in JSON format")
     research_parser.add_argument("--out", dest="output_file", help="Export research plan to markdown file")
 
@@ -498,8 +500,49 @@ def main(argv: List[str] = None) -> int:
 
 def handle_research(args: argparse.Namespace) -> int:
     import json
-    from minuscorrect.research import DeepResearchCoordinator
-    coordinator = DeepResearchCoordinator(args.topic)
+    from minuscorrect.research import (
+        DeepResearchCoordinator,
+        ResearchFinding,
+        ResearchWave,
+    )
+    from minuscorrect.store import MinusStore
+
+    store = MinusStore()
+    topic = (args.topic or "").strip()
+
+    if topic == "list":
+        sessions = store.list_research()
+        if getattr(args, "json", False):
+            print(json.dumps(sessions, indent=2))
+        else:
+            if not sessions:
+                print("[INFO] No research sessions found in .minus/research/.")
+            else:
+                print(f"MinusCorrect Saved Web Research Sessions ({len(sessions)} total):")
+                print(f"{'ID':<10} {'CONSENSUS':<18} {'FINDINGS':<10} {'DATE':<22} {'TOPIC'}")
+                print("-" * 84)
+                for s in sessions:
+                    date_str = s.get('created_at', '')[:19].replace('T', ' ')
+                    print(f"{s.get('id', ''):<10} {s.get('consensus_verdict', 'Consensus')[:16]:<18} {s.get('findings_count', 0):<10} {date_str:<22} {s.get('topic', '')}")
+        return 0
+
+    if topic in ("view", "compare"):
+        target_id = args.target_id
+        if not target_id:
+            print("[ERROR] Missing research ID. Usage: minuscorrect research view <RES-ID>", file=sys.stderr)
+            return 1
+        content = store.get_research(target_id)
+        if not content:
+            print(f"[ERROR] Research session '{target_id}' not found in .minus/research/.", file=sys.stderr)
+            return 1
+        print(content)
+        return 0
+
+    if not topic:
+        print("[ERROR] Missing research topic. Usage: minuscorrect research \"<topic>\" [--waves 3] [--save]", file=sys.stderr)
+        return 1
+
+    coordinator = DeepResearchCoordinator(topic)
 
     w0_queries = coordinator.plan_wave_0()
     w1_queries = coordinator.plan_wave_1() if args.waves >= 2 else []
@@ -510,7 +553,7 @@ def handle_research(args: argparse.Namespace) -> int:
 
     if getattr(args, "json", False):
         payload = {
-            "topic": args.topic,
+            "topic": topic,
             "waves": {
                 "wave_0_scout": [q.to_dict() for q in w0_queries],
                 "wave_1_expansion": [q.to_dict() for q in w1_queries],
@@ -522,7 +565,7 @@ def handle_research(args: argparse.Namespace) -> int:
         return 0
 
     print("=" * 76)
-    print(f"       MinusCorrect Deep Research Swarm: '{args.topic}'")
+    print(f"       MinusCorrect Deep Research Swarm: '{topic}'")
     print("=" * 76)
     print(f"Wave 0 (Scout):       {len(w0_queries)} Agent (Landscape Reconnaissance & Unknowns)")
     if args.waves >= 2:
@@ -536,10 +579,43 @@ def handle_research(args: argparse.Namespace) -> int:
         print(f"  {idx:02d}. [{q.wave.value:<17}] {q.role:<38} -> {q.angle}")
     print("=" * 76)
 
+    # If --save requested, synthesize full report with comparative analysis and store in .minus/research/
+    if getattr(args, "save", False):
+        baseline_findings = []
+        for q in all_queries:
+            domain = q.target_domains[0] if q.target_domains else "authoritative-docs.org"
+            baseline_findings.append(
+                ResearchFinding(
+                    query=q,
+                    source_url=f"https://{domain}/spec/{topic.lower().replace(' ', '-')}",
+                    title=f"{q.role} - Technical Specification & Analysis",
+                    summary=f"Analysis of {topic} covering {q.angle}.",
+                    sub_topics=[w.strip() for w in q.angle.split(",") if w.strip()][:4],
+                )
+            )
+
+        analysis = coordinator.analyze_and_compare(baseline_findings)
+        ontology = coordinator.synthesize_ontology(baseline_findings)
+        report_md = coordinator.render_full_report(baseline_findings, analysis=analysis, ontology=ontology)
+
+        rid = store.save_research(
+            topic=topic,
+            report_markdown=report_md,
+            metadata={
+                "findings_count": len(baseline_findings),
+                "sources_count": ontology.sources_count,
+                "consensus_score": analysis.consensus_score,
+                "consensus_verdict": analysis.consensus_verdict,
+                "contradictions_count": len(analysis.contradictions),
+            },
+        )
+        print(f"[SUCCESS] Complete research report saved to .minus/research/{rid}.md")
+        print(f"          Registered in .minus/index.json (Consensus: {analysis.consensus_verdict})")
+
     if args.output_file:
         out_path = Path(args.output_file)
         lines = [
-            f"# Deep Research Swarm Plan: {args.topic}",
+            f"# Deep Research Swarm Plan: {topic}",
             "",
             "- **Protocol**: Recursive 3-Wave Multi-Agent Ontology (1 -> 3 -> 8)",
             f"- **Total Swarm Size**: {len(all_queries)} Agents",

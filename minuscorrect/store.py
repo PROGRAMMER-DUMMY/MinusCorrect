@@ -148,6 +148,7 @@ class MinusStore:
         self.tickets_completed = self.root / "tickets" / "completed"
         self.incidents_dir = self.root / "incidents"
         self.sessions_dir = self.root / "sessions"
+        self.research_dir = self.root / "research"
         self.index_file = self.root / "index.json"
         self.ensure_layout()
 
@@ -157,6 +158,7 @@ class MinusStore:
         self.tickets_completed.mkdir(parents=True, exist_ok=True)
         self.incidents_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        self.research_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.index_file.exists():
             self._write_index({
@@ -165,13 +167,14 @@ class MinusStore:
                 "updated_at": datetime.now(timezone.utc).isoformat(),
                 "tickets": {},
                 "incidents": {},
+                "research": {},
             })
 
     def _read_index(self) -> Dict[str, Any]:
         try:
             return json.loads(self.index_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {"version": "1.0", "tickets": {}, "incidents": {}}
+            return {"version": "1.0", "tickets": {}, "incidents": {}, "research": {}}
 
     def _write_index(self, data: Dict[str, Any]) -> None:
         data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -324,3 +327,55 @@ class MinusStore:
         }
         self._write_index(idx)
         return inc_file
+
+    def next_research_id(self) -> str:
+        """Compute next sequential research session identifier (e.g. RES-001)."""
+        idx = self._read_index()
+        existing = list(idx.get("research", {}).keys())
+        nums = [0]
+        for r in existing:
+            m = re.match(r"^RES-(\d+)$", r)
+            if m:
+                nums.append(int(m.group(1)))
+        return f"RES-{max(nums) + 1:03d}"
+
+    def save_research(
+        self,
+        topic: str,
+        report_markdown: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        research_id: Optional[str] = None,
+    ) -> str:
+        """Save a deep research report into .minus/research/ and register in index.json."""
+        rid = research_id or self.next_research_id()
+        res_file = self.research_dir / f"{rid}.md"
+        res_file.write_text(report_markdown, encoding="utf-8")
+
+        meta = metadata or {}
+        idx = self._read_index()
+        idx.setdefault("research", {})[rid] = {
+            "id": rid,
+            "topic": topic,
+            "created_at": meta.get("created_at", datetime.now(timezone.utc).isoformat()),
+            "file": f"research/{rid}.md",
+            "findings_count": meta.get("findings_count", 0),
+            "sources_count": meta.get("sources_count", 0),
+            "consensus_score": meta.get("consensus_score", 1.0),
+            "consensus_verdict": meta.get("consensus_verdict", "Strong Consensus"),
+            "contradictions_count": meta.get("contradictions_count", 0),
+        }
+        self._write_index(idx)
+        return rid
+
+    def get_research(self, research_id: str) -> Optional[str]:
+        """Fetch research report markdown by ID."""
+        res_file = self.research_dir / f"{research_id}.md"
+        if res_file.exists():
+            return res_file.read_text(encoding="utf-8")
+        return None
+
+    def list_research(self) -> List[Dict[str, Any]]:
+        """List all saved research sessions from index.json."""
+        idx = self._read_index()
+        items = list(idx.get("research", {}).values())
+        return sorted(items, key=lambda r: r.get("id", ""))
