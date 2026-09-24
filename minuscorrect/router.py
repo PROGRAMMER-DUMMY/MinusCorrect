@@ -22,6 +22,7 @@ class RouteType:
     SUPERVISED_RUN = "SUPERVISED_RUN"
     TICKET = "TICKET"
     ANTI_CHEAT = "ANTI_CHEAT"
+    DEEP_RESEARCH = "DEEP_RESEARCH"
 
 
 @dataclass
@@ -104,6 +105,17 @@ def route_intent(query: str, cwd: Optional[Path] = None) -> RoutingDecision:
             recommended_command="minuscorrect ticket list",
             rationale="Detected second-brain ticket lifecycle operation.",
             extracted_entities={"scope": "ticket_store"},
+        )
+
+    # 5. Check for Deep Web Research Intent
+    research_keywords = ["deep research", "web research", "research swarm", "research ontology", "research on", "investigate topic", "multi-agent research"]
+    if any(kw in text.lower() for kw in research_keywords):
+        return RoutingDecision(
+            route=RouteType.DEEP_RESEARCH,
+            confidence=0.96,
+            recommended_command=f"minuscorrect research \"{text[:60]}\"",
+            rationale="Query requests multi-agent 3-wave deep research and ontology synthesis.",
+            extracted_entities={"topic": text[:60]},
         )
 
     # 5. Check for Council Intent (Debate, trade-offs, architecture dilemma)

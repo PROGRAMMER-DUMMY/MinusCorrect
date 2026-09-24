@@ -148,6 +148,13 @@ def build_parser() -> argparse.ArgumentParser:
     anti_cheat_parser.add_argument("--test-dir", default="tests", help="Tests directory (default: tests)")
     anti_cheat_parser.add_argument("--json", action="store_true", help="Output audit report in JSON format")
 
+    # Command: research
+    research_parser = subparsers.add_parser("research", help="Deep Web Research Swarm & Knowledge Ontology Protocol")
+    research_parser.add_argument("topic", help="Topic or technical architecture to research deeply")
+    research_parser.add_argument("--waves", type=int, default=3, choices=[1, 2, 3], help="Number of research waves to plan (default: 3)")
+    research_parser.add_argument("--json", action="store_true", help="Output research plan and agent specs in JSON format")
+    research_parser.add_argument("--out", dest="output_file", help="Export research plan to markdown file")
+
     # Command: plugin
     plugin_parser = subparsers.add_parser("plugin", help="Manage MinusCorrect agent integrations (Antigravity CLI, Claude Code)")
     plugin_parser.add_argument("action", choices=["status", "install"], help="Action to perform: 'status' or 'install'")
@@ -482,9 +489,78 @@ def main(argv: List[str] = None) -> int:
         return handle_route(args)
     elif args.command == "anti-cheat":
         return handle_anti_cheat(args)
+    elif args.command == "research":
+        return handle_research(args)
     else:
         parser.print_help()
         return 0
+
+
+def handle_research(args: argparse.Namespace) -> int:
+    import json
+    from minuscorrect.research import DeepResearchCoordinator
+    coordinator = DeepResearchCoordinator(args.topic)
+
+    w0_queries = coordinator.plan_wave_0()
+    w1_queries = coordinator.plan_wave_1() if args.waves >= 2 else []
+    w2_queries = coordinator.plan_wave_2() if args.waves >= 3 else []
+
+    all_queries = w0_queries + w1_queries + w2_queries
+    subagent_specs = coordinator.generate_subagent_specs(all_queries)
+
+    if getattr(args, "json", False):
+        payload = {
+            "topic": args.topic,
+            "waves": {
+                "wave_0_scout": [q.to_dict() for q in w0_queries],
+                "wave_1_expansion": [q.to_dict() for q in w1_queries],
+                "wave_2_deep_swarm": [q.to_dict() for q in w2_queries],
+            },
+            "subagent_specs": subagent_specs,
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print("=" * 76)
+    print(f"       MinusCorrect Deep Research Swarm: '{args.topic}'")
+    print("=" * 76)
+    print(f"Wave 0 (Scout):       {len(w0_queries)} Agent (Landscape Reconnaissance & Unknowns)")
+    if args.waves >= 2:
+        print(f"Wave 1 (Expansion):   {len(w1_queries)} Agents (Orthogonal Architecture & Failure Modes)")
+    if args.waves >= 3:
+        print(f"Wave 2 (Deep Swarm):  {len(w2_queries)} Agents (Parallel Specialized Deep Dives)")
+    print(f"Total Research Nodes: {len(all_queries)} Dispatched Subagents")
+    print("-" * 76)
+    print("Agent Dispatch Plan:")
+    for idx, q in enumerate(all_queries, 1):
+        print(f"  {idx:02d}. [{q.wave.value:<17}] {q.role:<38} -> {q.angle}")
+    print("=" * 76)
+
+    if args.output_file:
+        out_path = Path(args.output_file)
+        lines = [
+            f"# Deep Research Swarm Plan: {args.topic}",
+            "",
+            "- **Protocol**: Recursive 3-Wave Multi-Agent Ontology (1 -> 3 -> 8)",
+            f"- **Total Swarm Size**: {len(all_queries)} Agents",
+            "",
+            "## Wave 0: Foundational Scout",
+        ]
+        for q in w0_queries:
+            lines.append(f"- **{q.role}**: {q.angle} (Domains: {', '.join(q.target_domains)})")
+        if w1_queries:
+            lines.append("")
+            lines.append("## Wave 1: Orthogonal Expansion")
+            for q in w1_queries:
+                lines.append(f"- **{q.role}**: {q.angle} (Domains: {', '.join(q.target_domains)})")
+        if w2_queries:
+            lines.append("")
+            lines.append("## Wave 2: Specialized Deep Swarm")
+            for q in w2_queries:
+                lines.append(f"- **{q.role}**: {q.angle} (Domains: {', '.join(q.target_domains)})")
+        out_path.write_text("\n".join(lines), encoding="utf-8")
+        print(f"[SUCCESS] Research plan exported to {out_path}")
+    return 0
 
 
 def handle_harness(args: argparse.Namespace) -> int:

@@ -30,6 +30,9 @@ HIGH_RISK_CLAIM_PATTERNS = [
     r"\bdomain-agnostic\b",
 ]
 
+# Patterns for ephemeral agent debug logs that must not leak to production
+DEBUG_PATTERNS = re.compile(r"(\[DEBUG\]|console\.log\(\"__DEBUG__\"\)|__DEBUG__)")
+
 
 def run_git_command(args: List[str]) -> str:
     result = subprocess.run(
@@ -154,13 +157,14 @@ def check_debug_tags(auto_fix: bool = False) -> Tuple[bool, str]:
 
     for f in code_files:
         diff_output = run_git_command(["diff", "--cached", "--", f])
-        matches = debug_pattern.findall(diff_output)
+        matches = DEBUG_PATTERNS.findall(diff_output)
         if matches:
             if auto_fix:
                 try:
                     p = Path(f)
                     if p.exists():
                         lines = p.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+                        cleaned_lines = [line for line in lines if not DEBUG_PATTERNS.search(line)]
                         p.write_text("".join(cleaned_lines), encoding="utf-8")
                         run_git_command(["add", f])
                 except Exception as e:
