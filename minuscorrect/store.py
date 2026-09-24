@@ -149,6 +149,7 @@ class MinusStore:
         self.incidents_dir = self.root / "incidents"
         self.sessions_dir = self.root / "sessions"
         self.research_dir = self.root / "research"
+        self.rules_dir = self.root / "rules"
         self.index_file = self.root / "index.json"
         self.ensure_layout()
 
@@ -159,6 +160,7 @@ class MinusStore:
         self.incidents_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.research_dir.mkdir(parents=True, exist_ok=True)
+        self.rules_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.index_file.exists():
             self._write_index({
@@ -168,13 +170,14 @@ class MinusStore:
                 "tickets": {},
                 "incidents": {},
                 "research": {},
+                "rules": {},
             })
 
     def _read_index(self) -> Dict[str, Any]:
         try:
             return json.loads(self.index_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {"version": "1.0", "tickets": {}, "incidents": {}, "research": {}}
+            return {"version": "1.0", "tickets": {}, "incidents": {}, "research": {}, "rules": {}}
 
     def _write_index(self, data: Dict[str, Any]) -> None:
         data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -378,4 +381,84 @@ class MinusStore:
         """List all saved research sessions from index.json."""
         idx = self._read_index()
         items = list(idx.get("research", {}).values())
+        return sorted(items, key=lambda r: r.get("id", ""))
+
+    def next_rule_id(self) -> str:
+        """Compute next sequential rule identifier (e.g. RULE-001)."""
+        idx = self._read_index()
+        existing = list(idx.get("rules", {}).keys())
+        nums = [0]
+        for r in existing:
+            m = re.match(r"^RULE-(\d+)$", r)
+            if m:
+                nums.append(int(m.group(1)))
+        return f"RULE-{max(nums) + 1:03d}"
+
+    def save_rule(
+        self,
+        title: str,
+        instruction: str,
+        scope: str = "general",
+        enforcement: str = "strict",
+        prohibited_patterns: Optional[List[str]] = None,
+        rule_id: Optional[str] = None,
+    ) -> str:
+        """Save a natural language rule into .minus/rules/ and register in index.json."""
+        rid = rule_id or self.next_rule_id()
+        rule_file = self.rules_dir / f"{rid}.md"
+
+        content = [
+            "---",
+            f"id: {rid}",
+            f"title: \"{title}\"",
+            f"scope: {scope}",
+            f"enforcement: {enforcement}",
+            f"created_at: \"{datetime.now(timezone.utc).isoformat()}\"",
+            "---",
+            "",
+            f"# {rid}: {title}",
+            "",
+            f"- **Scope**: `{scope}`",
+            f"- **Enforcement**: `{enforcement}`",
+            "",
+            "## Invariant Instruction for Autonomous Agents",
+            instruction,
+        ]
+        if prohibited_patterns:
+            content.extend([
+                "",
+                "## Prohibited Patterns & Anti-Patterns",
+            ])
+            for pat in prohibited_patterns:
+                content.append(f"- `{pat}`")
+
+        rule_file.write_text("\n".join(content), encoding="utf-8")
+
+        idx = self._read_index()
+        idx.setdefault("rules", {})[rid] = {
+            "id": rid,
+            "title": title,
+            "scope": scope,
+            "enforcement": enforcement,
+            "file": f"rules/{rid}.md",
+            "instruction": instruction,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._write_index(idx)
+        return rid
+
+    def get_rule(self, rule_id: str) -> Optional[str]:
+        """Fetch rule content by ID."""
+        r_file = self.rules_dir / f"{rule_id}.md"
+        if r_file.exists():
+            return r_file.read_text(encoding="utf-8")
+        return None
+
+    def list_rules(self, scope: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List rules from index.json, optionally filtered by scope."""
+        idx = self._read_index()
+        items = list(idx.get("rules", {}).values())
+        if scope:
+            norm_scope = scope.lower()
+            items = [r for r in items if r.get("scope") in (norm_scope, "all", "general")]
         return sorted(items, key=lambda r: r.get("id", ""))

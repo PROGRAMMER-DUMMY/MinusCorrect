@@ -167,6 +167,29 @@ def build_parser() -> argparse.ArgumentParser:
     harness_export = harness_subparsers.add_parser("export", help="Export MinusCorrect SuperQode HarnessSpec")
     harness_export.add_argument("--format", choices=["json", "yaml"], default="json", help="Output format (default: json)")
 
+    # Command: intake (alias: plan)
+    intake_parser = subparsers.add_parser("intake", aliases=["plan"], help="Cognitive Intent Ingestion: extract invariants, auto-register rules, convene council, and write Ask-Matt tickets")
+    intake_parser.add_argument("prompt", help="Natural language request, instruction, or feature description")
+    intake_parser.add_argument("--no-save", action="store_true", help="Dry run without writing tickets or rules to .minus/")
+    intake_parser.add_argument("--json", action="store_true", help="Output intake results in JSON format")
+
+    # Command: rule
+    rule_parser = subparsers.add_parser("rule", help="Manage .minus/ second-brain project rules and invariants")
+    rule_sub = rule_parser.add_subparsers(dest="rule_action")
+
+    rule_list = rule_sub.add_parser("list", help="List rules in second-brain store")
+    rule_list.add_argument("--scope", help="Filter by scope (e.g. security, code, research)")
+    rule_list.add_argument("--json", action="store_true", help="Output rules in JSON format")
+
+    rule_view = rule_sub.add_parser("view", help="View rule details")
+    rule_view.add_argument("rule_id", help="Rule ID (e.g. RULE-001)")
+
+    rule_add = rule_sub.add_parser("add", help="Add custom natural language rule")
+    rule_add.add_argument("title", help="Rule title")
+    rule_add.add_argument("--instruction", "-i", required=True, help="Natural language instruction for agents")
+    rule_add.add_argument("--scope", choices=["general", "code", "security", "research", "database", "frontend", "distributed"], default="general")
+    rule_add.add_argument("--enforcement", choices=["strict", "advisory"], default="strict")
+
     return parser
 
 
@@ -493,9 +516,76 @@ def main(argv: List[str] = None) -> int:
         return handle_anti_cheat(args)
     elif args.command == "research":
         return handle_research(args)
+    elif args.command in ("intake", "plan"):
+        return handle_intake(args)
+    elif args.command == "rule":
+        return handle_rule(args)
     else:
         parser.print_help()
         return 0
+
+
+def handle_intake(args: argparse.Namespace) -> int:
+    from minuscorrect.intake import run_intake_pipeline
+    result = run_intake_pipeline(
+        prompt=args.prompt,
+        auto_save=not getattr(args, "no_save", False),
+    )
+    if getattr(args, "json", False):
+        import json
+        payload = {
+            "intent": result.intent.to_dict(),
+            "registered_rules": result.registered_rules,
+            "council_synthesis": result.council_synthesis,
+            "generated_tickets": result.generated_tickets,
+            "research_id": result.research_id,
+        }
+        print(json.dumps(payload, indent=2))
+    else:
+        print(result.render_markdown())
+    return 0
+
+
+def handle_rule(args: argparse.Namespace) -> int:
+    from minuscorrect.store import MinusStore
+    store = MinusStore()
+    action = getattr(args, "rule_action", "list") or "list"
+
+    if action == "list":
+        rules = store.list_rules(scope=getattr(args, "scope", None))
+        if getattr(args, "json", False):
+            import json
+            print(json.dumps(rules, indent=2))
+        else:
+            if not rules:
+                print("[INFO] No rules registered in .minus/rules/.")
+            else:
+                print(f"MinusCorrect Registered Project Rules ({len(rules)} total):")
+                print(f"{'ID':<10} {'SCOPE':<12} {'ENFORCEMENT':<14} {'TITLE'}")
+                print("-" * 72)
+                for r in rules:
+                    print(f"{r.get('id', ''):<10} {r.get('scope', '').upper():<12} {r.get('enforcement', '').upper():<14} {r.get('title', '')}")
+        return 0
+
+    elif action == "view":
+        content = store.get_rule(args.rule_id)
+        if not content:
+            print(f"[ERROR] Rule '{args.rule_id}' not found in .minus/rules/.", file=sys.stderr)
+            return 1
+        print(content)
+        return 0
+
+    elif action == "add":
+        rid = store.save_rule(
+            title=args.title,
+            instruction=args.instruction,
+            scope=args.scope,
+            enforcement=args.enforcement,
+        )
+        print(f"[SUCCESS] Saved rule {rid} in .minus/rules/{rid}.md and registered in index.json")
+        return 0
+
+    return 0
 
 
 def handle_research(args: argparse.Namespace) -> int:

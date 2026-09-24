@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional
 
 
 class RouteType:
+    INTAKE = "INTAKE"
+    RULE = "RULE"
     COUNCIL = "COUNCIL"
     SPEC_GENERATE = "SPEC_GENERATE"
     ASK_MATT = "ASK_MATT"
@@ -63,6 +65,35 @@ def route_intent(query: str, cwd: Optional[Path] = None) -> RoutingDecision:
     # verifies: tests/unit/test_router.py
     """
     text = query.strip()
+
+    # 0. Check for Cognitive Intake Intent (Conversational multi-intent, implicit rules, auto-deliberation)
+    intake_patterns = [
+        r"i mean",
+        r"understand the intent",
+        r"without.*mentioning.*rule",
+        r"write the tickets of implementation",
+        r"add those things",
+        r"and make sure we",
+    ]
+    if any(re.search(pat, text, re.IGNORECASE) for pat in intake_patterns):
+        return RoutingDecision(
+            route=RouteType.INTAKE,
+            confidence=0.97,
+            recommended_command=f"minuscorrect intake \"{text[:60]}\"",
+            rationale="Query contains conversational feature request with implicit invariants, requiring autonomous cognitive intake, rule extraction, and MinusCouncil ticket generation.",
+            extracted_entities={"prompt": text[:60]},
+        )
+
+    # Check for Rule Management Intent
+    rule_keywords = ["rule add", "rule list", "project rules", ".minus/rules", "manage rules"]
+    if any(kw in text.lower() for kw in rule_keywords):
+        return RoutingDecision(
+            route=RouteType.RULE,
+            confidence=0.95,
+            recommended_command="minuscorrect rule list",
+            rationale="Detected project rule management or inspection intent.",
+            extracted_entities={"scope": "rule_store"},
+        )
 
     # 1. Check for Crash Telemetry / Tracebacks (INCIDENT)
     if any(sig in text for sig in ("Traceback (most recent call last):", "Error: ", "FATAL:", "Exception in thread", "HTTP 500")):
