@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import subprocess
 from typing import Any, Dict, List, Optional
 
 
@@ -24,6 +26,12 @@ class ExecutionReceipt:
     verified_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     specialist: str = ""
     integrity_hash: str = ""
+    base_commit_sha: str = ""
+    head_commit_sha: str = ""
+    diff_file: Optional[str] = None
+    files_touched: List[str] = field(default_factory=list)
+    insertions: int = 0
+    deletions: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -59,6 +67,8 @@ class Ticket:
         ]
         if self.closed_at:
             lines.append(f"closed_at: {self.closed_at}")
+        if self.verification:
+            lines.append(f"verification: {json.dumps(self.verification)}")
         if self.blocked_by:
             lines.append(f"blocked_by: {json.dumps(self.blocked_by)}")
         if self.blocks:
@@ -66,7 +76,12 @@ class Ticket:
         if self.receipt:
             lines.append("receipt:")
             for k, v in self.receipt.to_dict().items():
-                lines.append(f"  {k}: \"{v}\"")
+                if isinstance(v, list):
+                    lines.append(f"  {k}: {json.dumps(v)}")
+                elif v is None:
+                    lines.append(f"  {k}: null")
+                else:
+                    lines.append(f"  {k}: \"{v}\"")
         lines.append("---")
         lines.append("")
         lines.append(f"# {self.id}: {self.title}")
@@ -103,23 +118,77 @@ class Ticket:
         frontmatter_match = re.match(r"^---\n(.*?)\n---\n*(.*)$", text, re.DOTALL)
         meta: Dict[str, Any] = {}
         body = text
+        receipt_dict: Dict[str, Any] = {}
+        in_receipt = False
+
         if frontmatter_match:
             fm_text, body = frontmatter_match.groups()
             for line in fm_text.splitlines():
+                if line.startswith("receipt:"):
+                    in_receipt = True
+                    continue
+                if in_receipt:
+                    if line.startswith("  ") and ":" in line:
+                        rk, rv = line.strip().split(":", 1)
+                        rk = rk.strip()
+                        rv = rv.strip().strip('"\'')
+                        if rv == "null":
+                            receipt_dict[rk] = None
+                        elif rv.startswith("[") and rv.endswith("]"):
+                            try:
+                                receipt_dict[rk] = json.loads(rv)
+                            except Exception:
+                                receipt_dict[rk] = []
+                        elif rv.isdigit():
+                            receipt_dict[rk] = int(rv)
+                        else:
+                            receipt_dict[rk] = rv
+                        continue
+                    elif not line.startswith("  "):
+                        in_receipt = False
+
                 if ":" in line and not line.startswith("  "):
                     k, v = line.split(":", 1)
                     k = k.strip()
-                    v = v.strip().strip('"\'')
+                    v = v.strip()
                     if v.startswith("[") and v.endswith("]"):
                         try:
                             v = json.loads(v)
                         except Exception:
                             pass
+                    elif v.startswith('"') and v.endswith('"'):
+                        try:
+                            v = json.loads(v)
+                        except Exception:
+                            v = v.strip('"\'')
+                    else:
+                        v = v.strip('"\'')
                     meta[k] = v
 
         # Extract objective and targets from body if present
         obj_match = re.search(r"- \*\*Objective\*\*:\s*(.+)$", body, re.MULTILINE)
         objective = obj_match.group(1).strip() if obj_match else meta.get("title", "")
+
+        parsed_receipt = None
+        if receipt_dict:
+            parsed_receipt = ExecutionReceipt(
+                commit_sha=str(receipt_dict.get("commit_sha", "")),
+                test_command=str(receipt_dict.get("test_command", "")),
+                exit_code=int(receipt_dict.get("exit_code", 0)),
+                verified_at=str(receipt_dict.get("verified_at", "")),
+                specialist=str(receipt_dict.get("specialist", "")),
+                integrity_hash=str(receipt_dict.get("integrity_hash", "")),
+                base_commit_sha=str(receipt_dict.get("base_commit_sha", "")),
+                head_commit_sha=str(receipt_dict.get("head_commit_sha", "")),
+                diff_file=receipt_dict.get("diff_file"),
+                files_touched=receipt_dict.get("files_touched", []) if isinstance(receipt_dict.get("files_touched"), list) else [],
+                insertions=int(receipt_dict.get("insertions", 0)),
+                deletions=int(receipt_dict.get("deletions", 0)),
+            )
+
+        # Extract verification contract from frontmatter or body
+        ver_match = re.search(r"## Verification Contract\s*\n```(?:bash|sh)?\s*\n(.*?)\n```", body, re.DOTALL)
+        verification = meta.get("verification") or (ver_match.group(1).strip() if ver_match else "minuscorrect verify --fix --strict")
 
         return cls(
             id=meta.get("id", "T-000"),
@@ -127,10 +196,12 @@ class Ticket:
             role=meta.get("role", "Process Isolation SRE"),
             status=meta.get("status", "open"),
             objective=objective,
+            verification=verification,
             created_at=meta.get("created_at", datetime.now(timezone.utc).isoformat()),
             closed_at=meta.get("closed_at"),
             blocked_by=meta.get("blocked_by", []) if isinstance(meta.get("blocked_by"), list) else [],
             blocks=meta.get("blocks", []) if isinstance(meta.get("blocks"), list) else [],
+            receipt=parsed_receipt,
             body=body.strip(),
         )
 
@@ -146,6 +217,8 @@ class MinusStore:
         self.root = (root_dir or Path.cwd()) / ".minus"
         self.tickets_open = self.root / "tickets" / "open"
         self.tickets_completed = self.root / "tickets" / "completed"
+        self.tickets_rolled_back = self.root / "tickets" / "rolled_back"
+        self.diffs_dir = self.root / "diffs"
         self.incidents_dir = self.root / "incidents"
         self.sessions_dir = self.root / "sessions"
         self.research_dir = self.root / "research"
@@ -157,6 +230,8 @@ class MinusStore:
         """Initialize directory tree and root index.json."""
         self.tickets_open.mkdir(parents=True, exist_ok=True)
         self.tickets_completed.mkdir(parents=True, exist_ok=True)
+        self.tickets_rolled_back.mkdir(parents=True, exist_ok=True)
+        self.diffs_dir.mkdir(parents=True, exist_ok=True)
         self.incidents_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.research_dir.mkdir(parents=True, exist_ok=True)
@@ -171,19 +246,134 @@ class MinusStore:
                 "incidents": {},
                 "research": {},
                 "rules": {},
+                "diffs": {},
             })
 
     def _read_index(self) -> Dict[str, Any]:
         try:
             return json.loads(self.index_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {"version": "1.0", "tickets": {}, "incidents": {}, "research": {}, "rules": {}}
+            return {
+                "version": "1.0",
+                "tickets": {},
+                "incidents": {},
+                "research": {},
+                "rules": {},
+                "diffs": {},
+            }
 
     def _write_index(self, data: Dict[str, Any]) -> None:
         data["updated_at"] = datetime.now(timezone.utc).isoformat()
         temp_file = self.index_file.with_suffix(".tmp")
         temp_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
         temp_file.replace(self.index_file)
+
+    def resolve_commit_sha(self, rev: str = "HEAD", cwd: Optional[Path] = None) -> str:
+        """Resolve a git revision into an exact 40-character commit SHA."""
+        target_dir = cwd or self.root.parent
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", rev],
+                cwd=str(target_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                return res.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return rev
+
+    def capture_ticket_diff(
+        self,
+        ticket_id: str,
+        base_sha: str,
+        head_sha: str,
+        cwd: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """
+        Capture unified git diff between base_sha and head_sha.
+        Persists bit-exact patch into .minus/diffs/<ticket_id>.patch.
+        """
+        target_dir = cwd or self.root.parent
+        patch_file = self.diffs_dir / f"{ticket_id}.patch"
+        stats: Dict[str, Any] = {
+            "diff_file": None,
+            "files_touched": [],
+            "insertions": 0,
+            "deletions": 0,
+            "patch_sha256": None,
+        }
+
+        try:
+            diff_cmd = ["git", "diff", f"{base_sha}..{head_sha}"]
+            res = subprocess.run(
+                diff_cmd,
+                cwd=str(target_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            patch_content = res.stdout if res.returncode == 0 else ""
+
+            if not patch_content.strip() and head_sha not in ("HEAD", ""):
+                show_res = subprocess.run(
+                    ["git", "show", "--format=", head_sha],
+                    cwd=str(target_dir),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if show_res.returncode == 0 and show_res.stdout.strip():
+                    patch_content = show_res.stdout
+
+            if patch_content.strip():
+                patch_file.write_text(patch_content, encoding="utf-8")
+                patch_hash = hashlib.sha256(patch_content.encode("utf-8")).hexdigest()
+                stats["diff_file"] = f"diffs/{ticket_id}.patch"
+                stats["patch_sha256"] = patch_hash
+
+            stat_res = subprocess.run(
+                ["git", "diff", "--numstat", f"{base_sha}..{head_sha}"],
+                cwd=str(target_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if stat_res.returncode == 0 and stat_res.stdout.strip():
+                for line in stat_res.stdout.splitlines():
+                    parts = line.split("\t")
+                    if len(parts) >= 3:
+                        ins = int(parts[0]) if parts[0].isdigit() else 0
+                        dels = int(parts[1]) if parts[1].isdigit() else 0
+                        stats["insertions"] += ins
+                        stats["deletions"] += dels
+                        stats["files_touched"].append(parts[2])
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+        return stats
+
+    def create_git_ref(
+        self,
+        ticket_id: str,
+        commit_sha: str,
+        cwd: Optional[Path] = None,
+    ) -> bool:
+        """Create or update a native git reference refs/minus/tickets/<ticket_id>."""
+        target_dir = cwd or self.root.parent
+        try:
+            res = subprocess.run(
+                ["git", "update-ref", f"refs/minus/tickets/{ticket_id}", commit_sha],
+                cwd=str(target_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return res.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
 
     def next_ticket_id(self) -> str:
         """Compute the next sequential ticket identifier (e.g. T-001)."""
@@ -244,19 +434,22 @@ class MinusStore:
         return ticket
 
     def get_ticket(self, ticket_id: str) -> Optional[Ticket]:
-        """Fetch ticket by ID from either open or completed folder."""
-        open_file = self.tickets_open / f"{ticket_id}.md"
-        if open_file.exists():
-            return Ticket.from_markdown(open_file.read_text(encoding="utf-8"))
+        """Fetch ticket by ID from open, completed, or rolled_back folder."""
+        for folder in (self.tickets_open, self.tickets_completed, self.tickets_rolled_back):
+            fpath = folder / f"{ticket_id}.md"
+            if fpath.exists():
+                return Ticket.from_markdown(fpath.read_text(encoding="utf-8"))
+        return None
 
-        completed_file = self.tickets_completed / f"{ticket_id}.md"
-        if completed_file.exists():
-            return Ticket.from_markdown(completed_file.read_text(encoding="utf-8"))
-
+    def get_ticket_diff(self, ticket_id: str) -> Optional[str]:
+        """Retrieve unified diff patch for a ticket if available."""
+        diff_path = self.diffs_dir / f"{ticket_id}.patch"
+        if diff_path.exists():
+            return diff_path.read_text(encoding="utf-8")
         return None
 
     def list_tickets(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
-        """List tickets from index.json with optional status filter ('open' or 'completed')."""
+        """List tickets from index.json with optional status filter."""
         idx = self._read_index()
         tickets = list(idx.get("tickets", {}).values())
         if status:
@@ -268,9 +461,13 @@ class MinusStore:
         self,
         ticket_id: str,
         commit_sha: str = "HEAD",
+        base_commit_sha: Optional[str] = None,
         test_command: str = "minuscorrect verify",
         exit_code: int = 0,
         specialist: str = "",
+        capture_diff: bool = True,
+        update_ref: bool = True,
+        cwd: Optional[Path] = None,
     ) -> Ticket:
         """
         Atomically transition ticket from open/ to completed/ and log machine execution receipt.
@@ -287,11 +484,34 @@ class MinusStore:
         ticket = Ticket.from_markdown(open_path.read_text(encoding="utf-8"))
         ticket.status = "completed"
         ticket.closed_at = datetime.now(timezone.utc).isoformat()
+
+        # Resolve Head and Base commits
+        head_sha = self.resolve_commit_sha(commit_sha, cwd=cwd) if commit_sha == "HEAD" else commit_sha
+        if base_commit_sha:
+            base_sha = base_commit_sha
+        else:
+            base_sha = self.resolve_commit_sha(f"{head_sha}~1", cwd=cwd) if head_sha != "HEAD" else "HEAD~1"
+
+        # Capture Diff and Stats
+        diff_stats: Dict[str, Any] = {"diff_file": None, "files_touched": [], "insertions": 0, "deletions": 0}
+        if capture_diff:
+            diff_stats = self.capture_ticket_diff(ticket_id, base_sha, head_sha, cwd=cwd)
+
+        # Update Git native ref pointer
+        if update_ref and head_sha not in ("HEAD", ""):
+            self.create_git_ref(ticket_id, head_sha, cwd=cwd)
+
         ticket.receipt = ExecutionReceipt(
-            commit_sha=commit_sha,
+            commit_sha=head_sha,
             test_command=test_command,
             exit_code=exit_code,
             specialist=specialist or ticket.role,
+            base_commit_sha=base_sha,
+            head_commit_sha=head_sha,
+            diff_file=diff_stats.get("diff_file"),
+            files_touched=diff_stats.get("files_touched", []),
+            insertions=diff_stats.get("insertions", 0),
+            deletions=diff_stats.get("deletions", 0),
         )
 
         completed_path.write_text(ticket.to_markdown(), encoding="utf-8")
@@ -308,6 +528,8 @@ class MinusStore:
             "file": f"tickets/completed/{ticket_id}.md",
             "receipt": ticket.receipt.to_dict(),
         })
+        if diff_stats.get("diff_file"):
+            idx.setdefault("diffs", {})[ticket_id] = diff_stats
         self._write_index(idx)
         return ticket
 

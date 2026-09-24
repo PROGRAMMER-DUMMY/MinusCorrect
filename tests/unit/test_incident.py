@@ -237,3 +237,66 @@ def test_cli_incident_command_no_defang(tmp_path, monkeypatch):
     # With --no-defang, the attack string is preserved in the inert JSON fixture
     assert "ignore previous instructions" in fixture_content
 
+
+def test_incident_blame_correlation_and_rca(tmp_path: Path) -> None:
+    import subprocess
+    from minuscorrect.incident import correlate_incident_to_ticket
+    from minuscorrect.store import MinusStore
+
+    # 1. Initialize temporary git repository
+    subprocess.run(["git", "init"], cwd=str(tmp_path), capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.name", "MinusTest"], cwd=str(tmp_path), capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.email", "test@minuscorrect.org"], cwd=str(tmp_path), capture_output=True, check=True)
+
+    # 2. Initial baseline commit
+    worker_file = tmp_path / "worker.py"
+    worker_file.write_text("def run():\n    return 42\n", encoding="utf-8")
+    subprocess.run(["git", "add", "worker.py"], cwd=str(tmp_path), capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-m", "init worker"], cwd=str(tmp_path), capture_output=True, check=True)
+
+    # 3. Agent commit under ticket
+    worker_file.write_text("def run():\n    raise ZeroDivisionError('boom')\n", encoding="utf-8")
+    subprocess.run(["git", "add", "worker.py"], cwd=str(tmp_path), capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-m", "feature: update worker"], cwd=str(tmp_path), capture_output=True, check=True)
+    head_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(tmp_path), capture_output=True, text=True, check=True).stdout.strip()
+
+    store = MinusStore(root_dir=tmp_path)
+    t = store.create_ticket("Update Worker Handler", role="Distributed Systems Engineer")
+    store.close_ticket(t.id, commit_sha=head_sha, cwd=tmp_path)
+
+    # 4. Correlate crash at worker.py:2
+    correlation = correlate_incident_to_ticket("worker.py", 2, cwd=tmp_path, store=store)
+    assert correlation is not None
+    assert correlation["ticket_id"] == t.id
+    assert correlation["commit_sha"] == head_sha
+    assert correlation["author_specialist"] == "Distributed Systems Engineer"
+    assert correlation["rollback_cmd"] == f"minuscorrect rollback {t.id}"
+
+    # 5. Parse incident and generate RCA
+    sentry_payload = {
+        "event_id": "evt-culprit-101",
+        "exception": {
+            "values": [{
+                "type": "ZeroDivisionError",
+                "value": "boom",
+                "stacktrace": {
+                    "frames": [{
+                        "filename": str(worker_file),
+                        "lineno": 2,
+                        "function": "run"
+                    }]
+                }
+            }]
+        }
+    }
+    report = parse_incident_payload(sentry_payload, cwd=tmp_path, store=store)
+    assert report.culprit_correlation is not None
+    assert report.culprit_correlation["ticket_id"] == t.id
+
+    rca_path = tmp_path / "RCA.md"
+    generate_rca_report(report, output_path=rca_path)
+    rca_text = rca_path.read_text(encoding="utf-8")
+    assert "## 5. Culprit Ticket & Agent Attribution" in rca_text
+    assert f"`{t.id}` (Update Worker Handler)" in rca_text
+    assert f"minuscorrect rollback {t.id}" in rca_text
+

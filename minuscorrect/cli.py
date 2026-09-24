@@ -5,6 +5,7 @@ MinusCorrect Unified Command-Line Interface
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -137,6 +138,16 @@ def build_parser() -> argparse.ArgumentParser:
     ticket_close.add_argument("--exit-code", type=int, default=0, help="Test exit code")
     ticket_close.add_argument("--specialist", default="", help="Specialist signing off on ticket")
 
+    ticket_diff = ticket_subparsers.add_parser("diff", help="Inspect unified diff patch for a ticket")
+    ticket_diff.add_argument("ticket_id", help="Ticket ID (e.g. T-001)")
+
+    ticket_rollback = ticket_subparsers.add_parser("rollback", help="Safely rollback a completed ticket")
+    ticket_rollback.add_argument("ticket_id", help="Ticket ID (e.g. T-001)")
+    ticket_rollback.add_argument("--force", action="store_true", help="Force rollback even if tree dirty or verification fails")
+    ticket_rollback.add_argument("--no-verify", action="store_true", help="Skip post-rollback verification")
+    ticket_rollback.add_argument("--reopen", action="store_true", help="Move ticket back to open/ for repair instead of rolled_back/")
+    ticket_rollback.add_argument("--json", action="store_true", help="Output result in JSON format")
+
     # Command: route
     route_parser = subparsers.add_parser("route", help="Smart Intent Router: classify request into optimal MinusCorrect route")
     route_parser.add_argument("query", help="Natural language request or telemetry text")
@@ -189,6 +200,18 @@ def build_parser() -> argparse.ArgumentParser:
     rule_add.add_argument("--instruction", "-i", required=True, help="Natural language instruction for agents")
     rule_add.add_argument("--scope", choices=["general", "code", "security", "research", "database", "frontend", "distributed"], default="general")
     rule_add.add_argument("--enforcement", choices=["strict", "advisory"], default="strict")
+
+    # Command: diff
+    diff_parser = subparsers.add_parser("diff", help="Inspect unified diff patch for a Second-Brain ticket")
+    diff_parser.add_argument("ticket_id", help="Ticket ID (e.g. T-001)")
+
+    # Command: rollback
+    rollback_parser = subparsers.add_parser("rollback", help="Atomic Rollback Engine: safely revert an agent ticket's commit with verification gates")
+    rollback_parser.add_argument("ticket_id", help="Ticket ID (e.g. T-001)")
+    rollback_parser.add_argument("--force", action="store_true", help="Force rollback even if tree dirty or verification fails")
+    rollback_parser.add_argument("--no-verify", action="store_true", help="Skip post-rollback verification")
+    rollback_parser.add_argument("--reopen", action="store_true", help="Move ticket back to open/ for repair instead of rolled_back/")
+    rollback_parser.add_argument("--json", action="store_true", help="Output result in JSON format")
 
     return parser
 
@@ -520,6 +543,10 @@ def main(argv: List[str] = None) -> int:
         return handle_intake(args)
     elif args.command == "rule":
         return handle_rule(args)
+    elif args.command == "diff":
+        return handle_diff(args)
+    elif args.command == "rollback":
+        return handle_rollback(args)
     else:
         parser.print_help()
         return 0
@@ -815,8 +842,49 @@ def handle_ticket(args: argparse.Namespace) -> int:
             print(f"[ERROR] {exc}", file=sys.stderr)
             return 1
 
+    elif action == "diff":
+        return handle_diff(args)
+
+    elif action == "rollback":
+        return handle_rollback(args)
+
     print(f"[ERROR] Unknown ticket action: {action}", file=sys.stderr)
     return 1
+
+
+def handle_diff(args: argparse.Namespace) -> int:
+    from minuscorrect.rollback import RollbackEngine
+    engine = RollbackEngine()
+    diff_text = engine.inspect_diff(args.ticket_id)
+    if not diff_text:
+        print(f"[ERROR] No diff patch found for ticket '{args.ticket_id}'.", file=sys.stderr)
+        return 1
+    print(f"=== Unified Diff Snapshot: {args.ticket_id} ===")
+    print(diff_text)
+    return 0
+
+
+def handle_rollback(args: argparse.Namespace) -> int:
+    from minuscorrect.rollback import RollbackEngine
+    engine = RollbackEngine()
+    result = engine.rollback_ticket(
+        ticket_id=args.ticket_id,
+        force=getattr(args, "force", False),
+        verify=not getattr(args, "no_verify", False),
+        reopen=getattr(args, "reopen", False),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        if result.success:
+            print(f"[SUCCESS] {result.message}")
+            if result.revert_commit:
+                print(f"          Revert Commit: {result.revert_commit}")
+        else:
+            print(f"[ERROR] Rollback failed ({result.status}): {result.message}", file=sys.stderr)
+            if result.verification_output:
+                print(f"[VERIFICATION TRACE]\n{result.verification_output[:500]}", file=sys.stderr)
+    return 0 if result.success else 1
 
 
 def handle_route(args: argparse.Namespace) -> int:

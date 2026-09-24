@@ -57,3 +57,18 @@ def test_route_default_supervised_run() -> None:
     decision = route_intent("Fix the flaky unit test in test_worker.py")
     assert decision.route == RouteType.SUPERVISED_RUN
     assert "minuscorrect run" in decision.recommended_command
+
+
+def test_route_rollback() -> None:
+    decision = route_intent("rollback ticket T-002 because tests are failing")
+    assert decision.route == RouteType.ROLLBACK
+    assert decision.recommended_command == "minuscorrect rollback T-002"
+    assert decision.extracted_entities.get("ticket_id") == "T-002"
+
+
+def test_route_diff() -> None:
+    decision = route_intent("show diff for ticket T-003")
+    assert decision.route == RouteType.DIFF
+    assert decision.recommended_command == "minuscorrect diff T-003"
+    assert decision.extracted_entities.get("ticket_id") == "T-003"
+

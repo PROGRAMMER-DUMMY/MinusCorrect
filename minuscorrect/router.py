@@ -25,6 +25,8 @@ class RouteType:
     TICKET = "TICKET"
     ANTI_CHEAT = "ANTI_CHEAT"
     DEEP_RESEARCH = "DEEP_RESEARCH"
+    ROLLBACK = "ROLLBACK"
+    DIFF = "DIFF"
 
 
 @dataclass
@@ -93,6 +95,30 @@ def route_intent(query: str, cwd: Optional[Path] = None) -> RoutingDecision:
             recommended_command="minuscorrect rule list",
             rationale="Detected project rule management or inspection intent.",
             extracted_entities={"scope": "rule_store"},
+        )
+
+    # Check for Rollback Intent
+    rollback_match = re.search(r"\b(?:rollback|revert|undo)\s+(?:ticket\s+)?(T-\d+)", text, re.IGNORECASE)
+    if rollback_match or any(k in text.lower() for k in ["rollback ticket", "undo ticket", "revert ticket", "rollback changes"]):
+        tid = rollback_match.group(1) if rollback_match else "T-001"
+        return RoutingDecision(
+            route=RouteType.ROLLBACK,
+            confidence=0.96,
+            recommended_command=f"minuscorrect rollback {tid}",
+            rationale=f"Detected request to safely revert ticket {tid} with closed-loop verification.",
+            extracted_entities={"ticket_id": tid},
+        )
+
+    # Check for Diff Intent
+    diff_match = re.search(r"\b(?:diff|patch|inspect diff|show diff)\s+(?:for\s+)?(?:ticket\s+)?(T-\d+)", text, re.IGNORECASE)
+    if diff_match or any(k in text.lower() for k in ["inspect diff", "ticket diff", "show patch"]):
+        tid = diff_match.group(1) if diff_match else "T-001"
+        return RoutingDecision(
+            route=RouteType.DIFF,
+            confidence=0.95,
+            recommended_command=f"minuscorrect diff {tid}",
+            rationale=f"Detected request to inspect unified diff patch for ticket {tid}.",
+            extracted_entities={"ticket_id": tid},
         )
 
     # 1. Check for Crash Telemetry / Tracebacks (INCIDENT)

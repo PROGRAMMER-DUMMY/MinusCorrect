@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -106,6 +107,9 @@ class IncidentReport:
     raw_sanitized: str = ""
     error_hash: str = ""
     defanged: bool = True
+    failing_file: Optional[str] = None
+    failing_line: Optional[int] = None
+    culprit_correlation: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if not self.error_hash:
@@ -113,10 +117,84 @@ class IncidentReport:
             self.error_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()[:16]
 
 
+def correlate_incident_to_ticket(
+    file_path: Union[str, Path],
+    line_number: int,
+    cwd: Optional[Path] = None,
+    store: Optional[Any] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Correlate a crash location (file and line) back to the originating git commit and ticket.
+    # verifies: tests/unit/test_incident.py
+    """
+    target_dir = cwd or Path.cwd()
+    norm_path = Path(file_path)
+    if norm_path.is_absolute():
+        try:
+            rel_file = norm_path.relative_to(target_dir).as_posix()
+        except ValueError:
+            rel_file = norm_path.as_posix()
+    else:
+        rel_file = norm_path.as_posix()
+
+    try:
+        res = subprocess.run(
+            ["git", "blame", "-L", f"{line_number},{line_number}", "--porcelain", rel_file],
+            cwd=str(target_dir),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode != 0 or not res.stdout.strip():
+            return None
+        first_line = res.stdout.strip().splitlines()[0]
+        commit_sha = first_line.split()[0]
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    from minuscorrect.store import MinusStore
+    s = store or MinusStore(root_dir=target_dir)
+    idx = s._read_index()
+    tickets = idx.get("tickets", {})
+
+    matching_ticket = None
+    for tid, tmeta in tickets.items():
+        receipt = tmeta.get("receipt", {})
+        if (
+            receipt.get("head_commit_sha") == commit_sha
+            or receipt.get("commit_sha") == commit_sha
+            or (commit_sha.startswith(receipt.get("commit_sha", "____")) and len(receipt.get("commit_sha", "")) >= 7)
+        ):
+            matching_ticket = tmeta
+            break
+
+    if matching_ticket:
+        tid = matching_ticket.get("id")
+        return {
+            "ticket_id": tid,
+            "commit_sha": commit_sha,
+            "title": matching_ticket.get("title", ""),
+            "author_specialist": matching_ticket.get("role", "Unknown Specialist"),
+            "status": matching_ticket.get("status", "completed"),
+            "rollback_cmd": f"minuscorrect rollback {tid}",
+        }
+
+    return {
+        "ticket_id": None,
+        "commit_sha": commit_sha,
+        "author_specialist": None,
+        "title": None,
+        "status": None,
+        "rollback_cmd": f"git revert {commit_sha[:8]}",
+    }
+
+
 def parse_incident_payload(
     raw: Union[str, Dict[str, Any]],
     incident_id: Optional[str] = None,
     defang: bool = True,
+    cwd: Optional[Path] = None,
+    store: Optional[Any] = None,
 ) -> IncidentReport:
     """
     Parses a Sentry/Datadog JSON payload or raw stack trace into a sanitized IncidentReport.
@@ -136,6 +214,8 @@ def parse_incident_payload(
     exc_msg = ""
     failing_mod = "unknown"
     failing_func = "unknown"
+    failing_file = None
+    failing_line = None
     sanitized_inputs: Dict[str, Any] = {}
     stack_trace = ""
 
@@ -154,6 +234,8 @@ def parse_incident_payload(
                     last_frame = frames[-1]
                     failing_mod = last_frame.get("module", last_frame.get("filename", "unknown"))
                     failing_func = last_frame.get("function", "unknown")
+                    failing_file = last_frame.get("filename", last_frame.get("abs_path"))
+                    failing_line = last_frame.get("lineno")
                     sanitized_inputs = last_frame.get("vars", {})
         # 2. Datadog / custom format
         elif "error.message" in parsed_json or "message" in parsed_json:
@@ -181,13 +263,22 @@ def parse_incident_payload(
             exc_type = match_exc.group(1)
             exc_msg = match_exc.group(2).strip()
 
-        match_frame = re.findall(r'File "([^"]+)", line \d+, in ([A-Za-z0-9_]+)', sanitized_text)
+        match_frame = re.findall(r'File "([^"]+)", line (\d+), in ([A-Za-z0-9_]+)', sanitized_text)
         if match_frame:
-            failing_mod, failing_func = match_frame[-1]
+            failing_file, line_str, failing_func = match_frame[-1]
+            failing_mod = failing_file
+            try:
+                failing_line = int(line_str)
+            except ValueError:
+                pass
 
     if not extracted_id:
         seed = f"{exc_type}:{exc_msg}:{stack_trace[:100]}"
         extracted_id = f"INC-{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:8].upper()}"
+
+    culprit_correlation = None
+    if failing_file and failing_line:
+        culprit_correlation = correlate_incident_to_ticket(failing_file, failing_line, cwd=cwd, store=store)
 
     return IncidentReport(
         incident_id=extracted_id,
@@ -199,6 +290,9 @@ def parse_incident_payload(
         stack_trace=stack_trace,
         raw_sanitized=sanitized_text,
         defanged=defang,
+        failing_file=failing_file,
+        failing_line=failing_line,
+        culprit_correlation=culprit_correlation,
     )
 
 
@@ -301,6 +395,26 @@ def generate_rca_report(
 
     history_str = "\n".join(history_lines)
 
+    correlation_section = ""
+    if report.culprit_correlation:
+        corr = report.culprit_correlation
+        tid_display = f"`{corr['ticket_id']}` ({corr.get('title', '')})" if corr.get('ticket_id') else "*(No ticket registered for commit)*"
+        spec_display = f"`{corr['author_specialist']}`" if corr.get('author_specialist') else "*(Unknown author)*"
+        correlation_section = f"""
+---
+
+## 5. Culprit Ticket & Agent Attribution
+- **Originating Git Commit**: `{corr['commit_sha'][:8]}`
+- **Responsible Second-Brain Ticket**: {tid_display}
+- **Author Specialist Persona**: {spec_display}
+- **Autonomous Remediation Command**:
+  ```bash
+  {corr['rollback_cmd']}
+  ```
+"""
+
+    remed_num = 6 if report.culprit_correlation else 5
+
     content = f"""# Incident Root Cause Analysis (RCA): `{report.incident_id}`
 
 **Generated:** {report.timestamp}
@@ -334,10 +448,10 @@ An unhandled exception was captured in production telemetry and ingested via Min
 
 ## 4. Supervisor Solver Iteration History
 {history_str}
-
+{correlation_section}
 ---
 
-## 5. Remediation & Preventive Invariants
+## {remed_num}. Remediation & Preventive Invariants
 1. **Contract Promotion:** Once verified by human maintainer, promote contract:
    ```bash
    ALLOW_GOLDEN_EDIT=1 git mv tests/staging/test_incident_{safe_id}.py tests/golden/
