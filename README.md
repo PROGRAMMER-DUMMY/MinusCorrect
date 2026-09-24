@@ -125,23 +125,85 @@ Outputs recommended command, confidence score, and extracted entities.
 ### 5. Second-Brain Ticket Lifecycle Store (`.minus/`)
 Maintains an embedded, local-first task and incident ledger with atomic state transitions and cryptographic commit SHA receipts:
 ```bash
-# List all active or completed tickets
+# List all active, completed, or rolled back tickets
 minuscorrect ticket list --status open
 
 # Create a domain-specialist ticket
 minuscorrect ticket create -t "Enforce RLS tenant policies" --role "Security & Policy Auditor"
 
-# Close ticket and record machine execution receipt
-minuscorrect ticket close T-001 --commit 9a8b7c6d --test-cmd "pytest tests/unit/" --exit-code 0
+# Close ticket and record machine execution receipt with commit SHA and diff snapshot
+minuscorrect ticket close T-001 --commit HEAD --test-cmd "pytest tests/unit/" --exit-code 0
 ```
 
-### 6. Full-Stack Blueprint & Spec Scaffolding (`minuscorrect spec`)
+### 6. Git-Pointer Time Machine & Unified Diff Snapshots (`minuscorrect diff`)
+Every closed ticket automatically captures its bit-exact patch to `.minus/diffs/<ticket_id>.patch` and registers a native Git reference at `refs/minus/tickets/<ticket_id>`:
+```bash
+# Inspect the unified diff patch associated with a closed ticket
+minuscorrect diff T-001
+# Or via subcommand
+minuscorrect ticket diff T-001
+```
+The ticket frontmatter permanently preserves `base_commit_sha`, `head_commit_sha`, `files_touched`, insertions, and deletions for auditing.
+
+### 7. Atomic Rollback Engine with Verification Gate (`minuscorrect rollback`)
+Safely revert faulty agent changes with closed-loop verification:
+```bash
+# Safely revert ticket T-001's commit and move to rolled_back/
+minuscorrect rollback T-001
+
+# Revert commit and move ticket back to open/ for immediate repair
+minuscorrect rollback T-001 --reopen
+
+# Force rollback even if working tree is dirty or skip test verification
+minuscorrect rollback T-001 --force --no-verify
+```
+**Rollback Lifecycle Invariants:**
+1. **Tree Cleanliness Check:** Verifies working tree is clean (automatically ignoring internal `.minus/` metadata).
+2. **Atomic Revert:** Executes a deterministic `git revert` of the ticket's `head_commit_sha`.
+3. **Verification Gate:** Automatically runs the ticket's registered verification command (`minuscorrect verify --fix --strict` or custom test). If verification fails, it safely resets `HEAD~1` to prevent repository corruption.
+4. **State Transition:** Atomically moves ticket metadata to `.minus/tickets/rolled_back/` (or back to `.minus/tickets/open/` when `--reopen` is passed).
+
+### 8. Cognitive Intent Ingestion & Rule Registration (`minuscorrect intake`)
+Directly ingests free-form natural language instructions, architectural requirements, or team rules without manual ticket writing:
+```bash
+# Ingest natural language request: auto-registers rules, convenes council, and scaffolds tickets
+minuscorrect intake "Always enforce Supabase RLS and require verified HMAC webhook signatures"
+
+# View and manage persistent project rules in .minus/rules/
+minuscorrect rule list
+minuscorrect rule add "Strict Concurrency Locks" -i "Use redis distributed lock for worker tasks" --scope code
+minuscorrect rule view RULE-001
+```
+
+### 9. Deep Web Research Swarm & Knowledge Ontology (`minuscorrect research`)
+Coordinates a multi-wave, parallel deep research swarm across technical domains with active query evolution and contradiction detection:
+```bash
+# Plan a 3-wave deep research swarm and synthesize findings into .minus/research/
+minuscorrect research "PostgreSQL Connection Pooling vs Supabase PgBouncer" --waves 3 --save
+
+# List or inspect past research ontology reports
+minuscorrect research list
+minuscorrect research view RES-001
+```
+
+### 10. Defensive Production Incident Pipeline & Culprit Attribution (`minuscorrect incident`)
+Ingests production crashes, scrubs PII, defangs prompt injections, and automatically maps stack traces back to culprit tickets via `git blame`:
+```bash
+# Ingest crash payload and correlate stack trace frame to author ticket
+minuscorrect incident crash.json --id INC-1042
+```
+Generates `INCIDENT-RCA-inc_1042.md` with:
+- **PII & Injection Defanging:** Redacts bearer tokens, secrets, and instruction-hijacking patterns.
+- **Culprit Ticket & Specialist Attribution:** Blames the failing source line to identify the exact ticket and specialist who authored the bug.
+- **Staged Reproduction Test:** Created in `tests/staging/test_incident_inc_1042.py`.
+
+### 11. Full-Stack Blueprint & Spec Scaffolding (`minuscorrect spec`)
 Generates comprehensive PRD, TRD, Refero-grade DESIGN (Tailwind v4 tokens, CSS variables, spring curves), Mermaid APPFLOW, PostgreSQL SCHEMA with mandatory RLS on all tables, and Ask-Matt PLAN:
 ```bash
 minuscorrect spec init --dir spec --name "EnterpriseSaaS"
 ```
 
-### 7. 10-Domain Pre-Launch Security & Operational Audit (`minuscorrect audit --pre-launch`)
+### 12. 10-Domain Pre-Launch Security & Operational Audit (`minuscorrect audit --pre-launch`)
 Audits projects for critical AI-generated failure modes:
 - Domain 1: Client Bundle Secret Leakage (`NEXT_PUBLIC_` traps)
 - Domain 2: Missing Supabase Row Level Security & Unsecured Views
@@ -157,13 +219,13 @@ Audits projects for critical AI-generated failure modes:
 minuscorrect audit --pre-launch
 ```
 
-### 8. Anti-Benchmark-Maxxing & Anti-Cheating Guardian (`minuscorrect anti-cheat`)
+### 13. Anti-Benchmark-Maxxing & Anti-Cheating Guardian (`minuscorrect anti-cheat`)
 Prevents LLMs from overfitting to test fixtures, generating tautological assertions (`assert True`), or using hardcoded test bypass branches:
 ```bash
 minuscorrect anti-cheat --source-dir minuscorrect --test-dir tests
 ```
 
-### 9. Active Git Pre-Commit Hook & Host-Level Protection
+### 14. Active Git Pre-Commit Hook & Host-Level Protection
 * **Local Pre-Commit Hook:** Active at `.git/hooks/pre-commit`. Runs automatically on every `git commit`.
 * **Git Host CODEOWNERS:** Hard-locked via `.github/CODEOWNERS`. Unauthorized agent shell commits cannot modify `tests/golden/`.
 * **Standard Pre-Commit Package:** Any external project can adopt MinusCorrect in 60 seconds by adding it to `.pre-commit-config.yaml`:
@@ -180,7 +242,7 @@ minuscorrect anti-cheat --source-dir minuscorrect --test-dir tests
 ALLOW_GOLDEN_EDIT=1 git commit -m "chore: update golden contract"
 ```
 
-### 10. Prompting Agents (Claude Code, Agy, Codex, Cursor)
+### 15. Prompting Agents (Claude Code, Agy, Codex, Cursor)
 When dispatching an autonomous agent:
 > *"Implement the solution to pass `tests/golden/test_billing.py`. Note: `tests/golden/` is STRICTLY READ-ONLY. Mutate only `src/billing.py`. Adhere to `AGENTS.md`."*
 
@@ -244,6 +306,15 @@ MinusCorrect enforces this exact discipline on autonomous AI systems. It transfo
 ```
 +-- .agent-rules/
 |   +-- systemic-integrity.md         # Canonical core specification
++-- .minus/                           # Second-Brain local-first state ledger
+|   +-- tickets/                      # Task lifecycle partitions
+|   |   +-- open/                     # Active tickets awaiting execution
+|   |   +-- completed/                # Closed tickets with cryptographic receipts
+|   |   +-- rolled_back/              # Safely rolled-back tickets
+|   +-- diffs/                        # Bit-exact unified diff patches (<ticket_id>.patch)
+|   +-- rules/                        # Registered project invariants and team rules
+|   +-- research/                     # Synthesized deep research reports and matrices
+|   +-- incidents/                    # Production incident telemetry & triage
 +-- .github/
 |   +-- CODEOWNERS                    # Hard-lock golden contracts at the Git host level
 |   +-- workflows/
@@ -263,21 +334,33 @@ MinusCorrect enforces this exact discipline on autonomous AI systems. It transfo
 |   +-- README.md                     # Symlinked navigation hub
 +-- minuscorrect/                     # Turnkey Python package
 |   +-- __init__.py                   # Package exports
-|   +-- cli.py                        # Unified CLI (run, verify, status, reset)
+|   +-- cli.py                        # Unified CLI (run, verify, ticket, diff, rollback, intake)
 |   +-- supervisor.py                 # Out-of-process supervisor & session state
 |   +-- verifier.py                   # Integrity verifier & auto-fixer engine
+|   +-- rollback.py                   # Atomic rollback engine & diff inspector
+|   +-- store.py                      # MinusStore Second-Brain metadata manager
+|   +-- intake.py                     # Cognitive intent & rule extraction engine
+|   +-- research.py                   # 3-wave deep research swarm coordinator
+|   +-- router.py                     # Smart intent router & command dispatcher
+|   +-- incident.py                   # Incident ingestion & git-blame correlation
+|   +-- spec.py                       # PRD/TRD/Refero/Appflow/Schema blueprint generator
+|   +-- audit.py                      # 10-domain pre-launch security auditor
+|   +-- anticheat.py                  # Anti-benchmark cheating AST detector
+|   +-- patch.py                      # Blast-radius patch gatekeeper
+|   +-- worktree.py                   # Ephemeral git worktree sandbox
+|   +-- pr.py                         # Decoupled draft PR generator
+|   +-- mcp_server.py                 # JSON-RPC MCP server
 +-- pyproject.toml                    # Standard Python package specification & entry points
 +-- scripts/
 |   +-- supervisor.py                 # Supervisor CLI wrapper
 |   +-- verify_integrity.py           # Integrity verifier CLI wrapper
 +-- tests/
 |   +-- golden/README.md              # Immutable acceptance contracts
-|   +-- unit/
-|       +-- README.md                 # Mutable developer unit tests
-|       +-- test_supervisor.py        # Supervisor unit test suite
+|   +-- unit/                         # Mutable developer unit tests (203 tests)
 +-- AGENTS.md                         # Universal agent standard (Claude Code, AGY, Codex, Cursor)
 +-- .codex/instructions.md            # Native bootstrap for Codex Agent
 +-- .cursorrules                      # Native bootstrap for Cursor
++-- skills/                           # Agent skill specifications (Council, Security, Ask-Matt)
 ```
 
 ---

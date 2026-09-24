@@ -267,3 +267,75 @@ MinusCorrect bundles standalone, declarative skill specifications for agent pre-
 
 - **`skills/minuscorrect-council/SKILL.md`**: Multi-perspective deliberation protocol (Contrarian, First Principles, Expansionist, Outsider, Executor) to stress-test high-risk bug fixes and architectural decisions before burning iteration budgets.
 - **`skills/minuscorrect-security/SKILL.md`**: Fused 10-domain security checklist (secrets, input validation, SQLi, XSS, CSRF, auth/RLS, sensitive logging, crypto, dependencies) with adversarial PoC contract synthesis for closed-loop remediation.
+
+---
+
+## 14. Git-Pointer Time Machine & Unified Diff Snapshots (`minuscorrect diff`)
+
+Every closed ticket in the Second-Brain ledger captures its exact Git execution receipt:
+- Base commit SHA and Head commit SHA.
+- Bit-exact unified diff patch written to `.minus/diffs/<ticket_id>.patch`.
+- Native Git reference registered at `refs/minus/tickets/<ticket_id>`.
+
+```bash
+# View the unified diff patch associated with a closed ticket
+minuscorrect diff T-001
+
+# Or via ticket subcommand
+minuscorrect ticket diff T-001
+```
+
+---
+
+## 15. Atomic Rollback Engine with Verification Gate (`minuscorrect rollback`)
+
+Safely and atomically revert faulty agent changes with closed-loop verification:
+
+```bash
+# Safely revert ticket T-001's commit and move to rolled_back/
+minuscorrect rollback T-001
+
+# Revert commit and move ticket back to open/ for immediate repair
+minuscorrect rollback T-001 --reopen
+
+# Force rollback even if working tree is dirty or skip test verification
+minuscorrect rollback T-001 --force --no-verify
+```
+
+### Safety Guarantees:
+1. **Tree Cleanliness Check:** Ensures no uncommitted application changes exist (safely ignores internal `.minus/` metadata).
+2. **Deterministic Revert:** Issues `git revert` targeting the ticket's `head_commit_sha`.
+3. **Verification Gate:** Runs `minuscorrect verify --fix --strict` (or the ticket's registered verification command). If it fails, safely resets `HEAD~1` to keep the branch clean.
+4. **State Transition:** Atomically moves ticket metadata to `.minus/tickets/rolled_back/` (or back to `open/` if `--reopen` was supplied).
+
+---
+
+## 16. Cognitive Intent Ingestion & Rule Registration (`minuscorrect intake`)
+
+Eliminate manual ticket writing and rule synchronization. Ingest raw human intent or natural language rules:
+
+```bash
+# Ingest natural language request: auto-registers rules, convenes council, and scaffolds Ask-Matt tickets
+minuscorrect intake "Always enforce Supabase RLS and require verified HMAC webhook signatures"
+
+# Manage persistent project rules in .minus/rules/
+minuscorrect rule list
+minuscorrect rule add "Strict Concurrency Locks" -i "Use redis distributed lock for worker tasks" --scope code
+minuscorrect rule view RULE-001
+```
+
+---
+
+## 17. Deep Web Research Swarm & Knowledge Ontology (`minuscorrect research`)
+
+Coordinate a 3-wave, parallel deep research swarm across technical domains with active query evolution and contradiction detection:
+
+```bash
+# Plan a 3-wave deep research swarm and synthesize findings into .minus/research/
+minuscorrect research "PostgreSQL Connection Pooling vs Supabase PgBouncer" --waves 3 --save
+
+# List or inspect past research ontology reports
+minuscorrect research list
+minuscorrect research view RES-001
+```
+

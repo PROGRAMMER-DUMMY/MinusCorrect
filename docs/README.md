@@ -56,3 +56,24 @@ Welcome to the documentation suite for **MinusCorrect**, the systemic integrity 
 10. [Anti-Benchmark-Maxxing & Anti-Cheating Guardian](quickstart.md#8-anti-benchmark-maxxing--anti-cheating-guardian-minuscorrect-anti-cheat)
     - AST detection of hardcoded test fixture branch bypasses
     - Tautological assertion detection and exception swallowing audits
+
+11. [Git-Pointer Time Machine & Unified Diff Snapshots](quickstart.md#14-git-pointer-time-machine--unified-diff-snapshots-minuscorrect-diff)
+    - Automated patch capture in `.minus/diffs/<ticket_id>.patch`
+    - Native git reference registration under `refs/minus/tickets/<ticket_id>`
+    - Audit logs with base/head commit SHAs, file lists, and diff stats
+
+12. [Atomic Rollback Engine & Verification Gate](quickstart.md#15-atomic-rollback-engine-with-verification-gate-minuscorrect-rollback)
+    - Deterministic `git revert` of ticket head commits
+    - Safe pre-flight working tree checks excluding `.minus/` metadata
+    - Post-rollback test verification gate with automatic reset on failure
+    - State transition to `.minus/tickets/rolled_back/` (or `--reopen` to `open/`)
+
+13. [Cognitive Intent Ingestion & Rule Registration](quickstart.md#16-cognitive-intent-ingestion--rule-registration-minuscorrect-intake)
+    - Natural language prompt intake without manual ticket creation
+    - Persistent rule registration in `.minus/rules/`
+    - MinusCouncil deliberation and Ask-Matt ticket decomposition
+
+14. [Deep Web Research Swarm & Knowledge Ontology](quickstart.md#17-deep-web-research-swarm--knowledge-ontology-minuscorrect-research)
+    - 3-wave parallel subagent exploration across technical domains
+    - Dynamic query evolution based on entity discovery
+    - Contradiction detection and persistent ontology storage in `.minus/research/`
