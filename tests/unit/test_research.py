@@ -67,6 +67,66 @@ def test_deep_research_coordinator_wave_progression():
     assert len({q.agent_id for q in w2}) == 8
 
 
+def test_dynamic_query_evolution_across_waves():
+    """Verify that Wave 1 and Wave 2 queries dynamically incorporate leads from previous findings."""
+    coordinator = DeepResearchCoordinator("PostgreSQL RLS")
+
+    # Simulate Wave 0 finding
+    q0 = coordinator.plan_wave_0()[0]
+    scout_findings = [
+        ResearchFinding(
+            query=q0,
+            source_url="https://supabase.com/docs/guides/database/postgres/row-level-security",
+            title="Postgres RLS Guide",
+            summary="Explains SECURITY DEFINER traps and auth.uid() scoping.",
+            sub_topics=["SECURITY DEFINER", "auth.uid()", "Foreign Key Joins"],
+        )
+    ]
+
+    # Plan Wave 1 using Wave 0 findings
+    w1 = coordinator.plan_wave_1(scout_findings)
+    assert len(w1) == 3
+    for q in w1:
+        assert "Focus areas discovered in Wave 0: SECURITY DEFINER" in q.angle
+        assert "SECURITY DEFINER" in q.search_prompt
+
+    # Simulate Wave 1 findings
+    wave_1_findings = [
+        ResearchFinding(
+            query=w1[0], # expansion-01 (Architecture)
+            source_url="https://postgresql.org/docs/current/ddl-rowsecurity.html",
+            title="PostgreSQL Row Security Policies",
+            summary="Defines policy expressions and permissive vs restrictive filters.",
+            sub_topics=["Permissive Policies", "Restrictive Policies"],
+        ),
+        ResearchFinding(
+            query=w1[1], # expansion-02 (Failure Modes)
+            source_url="https://github.com/supabase/supabase/issues",
+            title="RLS Recursion Error",
+            summary="Infinite recursion when joining tables with cross-referencing RLS.",
+            sub_topics=["Infinite Recursion 42P17", "Stack Depth Limit"],
+        ),
+        ResearchFinding(
+            query=w1[2], # expansion-03 (Security)
+            source_url="https://nvd.nist.gov/vuln/detail/CVE-2023-XXXX",
+            title="View Security Invoker Trap",
+            summary="Bypassing RLS via views created without security_invoker = true.",
+            sub_topics=["security_invoker = true", "Owner Privilege Escalation"],
+        ),
+    ]
+
+    # Plan Wave 2 using Wave 1 findings
+    w2 = coordinator.plan_wave_2(wave_1_findings)
+    assert len(w2) == 8
+
+    # Check that specialist queries received relevant Wave 1 leads
+    q_red_team = next(q for q in w2 if q.agent_id == "deep-swarm-03")
+    assert "security_invoker = true" in q_red_team.angle
+
+    q_db_arch = next(q for q in w2 if q.agent_id == "deep-swarm-07")
+    assert "Infinite Recursion 42P17" in q_db_arch.angle
+
+
 def test_subagent_specs_generation():
     """Verify Antigravity invoke_subagent specifications format."""
     coordinator = DeepResearchCoordinator("Next.js Server Actions")

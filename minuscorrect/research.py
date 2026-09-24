@@ -153,24 +153,31 @@ class DeepResearchCoordinator:
         ]
 
     def plan_wave_1(self, scout_findings: Optional[List[ResearchFinding]] = None) -> List[ResearchQuery]:
-        """Wave 1 (Expansion): 3 parallel agents analyzing orthogonal dimensions based on scout findings."""
+        """Wave 1 (Expansion): 3 parallel agents analyzing orthogonal dimensions dynamically enriched by scout findings."""
+        discovered_leads: List[str] = []
+        if scout_findings:
+            for f in scout_findings:
+                discovered_leads.extend(f.sub_topics)
+
+        leads_summary = f" (Focus areas discovered in Wave 0: {', '.join(discovered_leads[:5])})" if discovered_leads else ""
+
         angles = [
             (
                 "expansion-01",
                 "Core Architecture & Implementation Specs",
-                "protocols, data flow, memory model, and formal specifications",
+                f"protocols, data flow, memory model, and formal specifications{leads_summary}",
                 ["github.com", "readthedocs.io", "ietf.org"],
             ),
             (
                 "expansion-02",
                 "Production Failure Modes & Edge Cases",
-                "concurrency locks, race conditions, memory leaks, and performance cliffs",
+                f"concurrency locks, race conditions, memory leaks, and performance cliffs{leads_summary}",
                 ["stackoverflow.com", "news.ycombinator.com", "github.com/issues"],
             ),
             (
                 "expansion-03",
                 "Security Vulnerabilities & Threat Model",
-                "injection vectors, authentication bypass, data exfiltration, and sandbox escape",
+                f"injection vectors, authentication bypass, data exfiltration, and sandbox escape{leads_summary}",
                 ["cve.mitre.org", "nvd.nist.gov", "owasp.org"],
             ),
         ]
@@ -190,54 +197,64 @@ class DeepResearchCoordinator:
         return queries
 
     def plan_wave_2(self, wave_1_findings: Optional[List[ResearchFinding]] = None) -> List[ResearchQuery]:
-        """Wave 2 (Deep Swarm): 8 parallel specialized agents executing deep-dive research."""
+        """Wave 2 (Deep Swarm): 8 parallel specialized agents executing deep-dive research enriched by Wave 1."""
+        findings_by_agent: Dict[str, List[str]] = {}
+        if wave_1_findings:
+            for f in wave_1_findings:
+                findings_by_agent.setdefault(f.query.agent_id, []).extend(f.sub_topics)
+
+        # Map Wave 1 leads into relevant deep-swarm disciplines
+        arch_leads = ", ".join(findings_by_agent.get("expansion-01", [])[:4])
+        failure_leads = ", ".join(findings_by_agent.get("expansion-02", [])[:4])
+        security_leads = ", ".join(findings_by_agent.get("expansion-03", [])[:4])
+
         disciplines = [
             (
                 "deep-swarm-01",
                 "Formal Protocol & Spec Auditor",
-                "IETF/W3C/ECMA specifications, RFCs, and binary wire formats",
+                f"IETF/W3C/ECMA specifications, RFCs, and binary wire formats{f' (Focus: {arch_leads})' if arch_leads else ''}",
                 ["ietf.org", "w3.org", "github.com"],
             ),
             (
                 "deep-swarm-02",
                 "Kernel & Process Isolation SRE",
-                "OS namespaces, cgroups v2, signal traps, and ephemeral storage",
+                f"OS namespaces, cgroups v2, signal traps, and ephemeral storage{f' (Focus: {failure_leads})' if failure_leads else ''}",
                 ["kernel.org", "man7.org", "docs.kernel.org"],
             ),
             (
                 "deep-swarm-03",
                 "Adversarial Red Team Analyst",
-                "prompt injections, sandbox escape primitives, and supply-chain poison",
+                f"prompt injections, sandbox escape primitives, and supply-chain poison{f' (Focus: {security_leads})' if security_leads else ''}",
                 ["nvd.nist.gov", "owasp.org", "exploit-db.com"],
             ),
             (
                 "deep-swarm-04",
                 "Empirical Performance Benchmarker",
-                "wall-clock latency, throughput limits, token overhead, and cold starts",
+                f"wall-clock latency, throughput limits, token overhead, and cold starts{f' (Focus: {failure_leads})' if failure_leads else ''}",
                 ["arxiv.org", "paperswithcode.com", "benchmarks.llm.org"],
             ),
             (
                 "deep-swarm-05",
                 "Developer Ergonomics & TUI Specialist",
-                "CLI stream discipline, keyboard protocols, terminal escape sequences, and VS Code ConPTY",
+                f"CLI stream discipline, keyboard protocols, terminal escape sequences, and VS Code ConPTY{f' (Focus: {arch_leads})' if arch_leads else ''}",
                 ["github.com/microsoft/vscode", "github.com/xtermjs/xterm.js"],
             ),
             (
                 "deep-swarm-06",
                 "Evaluation Integrity & Anti-Cheat SRE",
-                "test set contamination, benchmark memorization, and assertion loosening",
+                f"test set contamination, benchmark memorization, and assertion loosening{f' (Focus: {arch_leads})' if arch_leads else ''}",
                 ["evals.openai.com", "arxiv.org", "github.com"],
             ),
             (
                 "deep-swarm-07",
                 "Database & Relational Model Architect",
-                "PostgreSQL Supabase RLS, connection pooling, indexing traps, and ACID rollback",
+                f"PostgreSQL Supabase RLS, connection pooling, indexing traps, and ACID rollback{f' (Focus: {failure_leads or security_leads})' if (failure_leads or security_leads) else ''}",
                 ["postgresql.org", "supabase.com/docs"],
             ),
             (
                 "deep-swarm-08",
                 "Future Horizon & Emerging Research Forecaster",
-                "recent 2025/2026 pre-prints, upcoming paradigms, and adjacent technology trends",
+                f"recent 2025/2026 pre-prints, upcoming paradigms, and adjacent technology trends{f' (Focus: {arch_leads})' if arch_leads else ''}",
                 ["arxiv.org", "news.ycombinator.com"],
             ),
         ]
