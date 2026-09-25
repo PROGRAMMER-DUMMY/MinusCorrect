@@ -309,11 +309,18 @@ def inspect_plugin_status() -> Dict[str, Any]:
     global_plugin_dir = user_home / ".gemini" / "config" / "plugins" / "minuscorrect"
     global_skills_dir = user_home / ".gemini" / "config" / "skills"
 
+    def is_skill_present(name: str) -> bool:
+        return (global_skills_dir / name / "SKILL.md").is_file() or (
+            global_plugin_dir / "skills" / name / "SKILL.md"
+        ).is_file()
+
     skills_present = {
-        "minuscorrect": (global_skills_dir / "minuscorrect" / "SKILL.md").is_file(),
-        "minuscorrect-council": (global_skills_dir / "minuscorrect-council" / "SKILL.md").is_file(),
-        "ask-matt": (global_skills_dir / "ask-matt" / "SKILL.md").is_file(),
-        "minuscorrect-security": (global_skills_dir / "minuscorrect-security" / "SKILL.md").is_file(),
+        "minuscorrect": is_skill_present("minuscorrect"),
+        "minuscorrect-council": is_skill_present("minuscorrect-council"),
+        "ask-matt": is_skill_present("ask-matt"),
+        "minuscorrect-security": is_skill_present("minuscorrect-security"),
+        "minuscorrect-research": is_skill_present("minuscorrect-research"),
+        "deep-research": is_skill_present("deep-research"),
     }
 
     # Check agy plugins list
@@ -339,8 +346,22 @@ def install_plugin() -> tuple[bool, str]:
     if not source_dir.is_dir() or not (source_dir / "plugin.json").is_file():
         return False, f"Plugin source directory not found at {source_dir}"
 
+    global_skills_dir = Path.home() / ".gemini" / "config" / "skills"
+    global_skills_dir.mkdir(parents=True, exist_ok=True)
+    skills_src = source_dir / "skills"
+
+    def sync_skills() -> None:
+        if skills_src.is_dir():
+            for skill_folder in skills_src.iterdir():
+                if skill_folder.is_dir():
+                    dest_skill = global_skills_dir / skill_folder.name
+                    if dest_skill.exists():
+                        shutil.rmtree(dest_skill)
+                    shutil.copytree(skill_folder, dest_skill)
+
     try:
         res = subprocess.run(["agy", "plugin", "install", str(source_dir)], capture_output=True, text=True, check=False)
+        sync_skills()
         if res.returncode == 0:
             return True, f"Successfully installed MinusCorrect plugin into Antigravity CLI:\n{res.stdout.strip()}"
         return False, f"Failed to install plugin via agy: {res.stderr.strip()}"
@@ -351,6 +372,8 @@ def install_plugin() -> tuple[bool, str]:
             if dest_dir.exists():
                 shutil.rmtree(dest_dir)
             shutil.copytree(source_dir, dest_dir)
-            return True, f"Copied MinusCorrect plugin directly to {dest_dir} (agy command not found in PATH)."
+            sync_skills()
+            return True, f"Copied MinusCorrect plugin directly to {dest_dir} and synced skills to {global_skills_dir}."
         except Exception as copy_exc:
             return False, f"Failed to copy plugin: {copy_exc}"
+

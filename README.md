@@ -225,7 +225,25 @@ Prevents LLMs from overfitting to test fixtures, generating tautological asserti
 minuscorrect anti-cheat --source-dir minuscorrect --test-dir tests
 ```
 
-### 14. Active Git Pre-Commit Hook & Host-Level Protection
+### 14. Antigravity Plugin & Global Slash Commands (`minuscorrect plugin`)
+Install MinusCorrect's full skills library and slash commands into your global agent environment with one command:
+```bash
+# Check installation and registration status of all skills
+minuscorrect plugin status
+
+# Install plugin into Antigravity CLI and sync skills globally
+minuscorrect plugin install
+```
+Registered slash commands:
+- `/research` or `/deep-research`: 3-wave multi-agent deep research swarm and ontology synthesis
+- `/council`: Convene the 5-advisor LLM Council on questions or architectural trade-offs
+- `/ask-matt`: Spec-to-tickets decomposition DAG with domain specialists
+- `/minuscorrect`: Autonomous execution supervisor and atomic rollback
+- `/verify`: Systemic integrity and docstring superlative verification
+- `/doctor`: Environment diagnostics (Git, Python, ConPTY, Worktrees)
+- `/harness`: SuperQode SystemOne integration spec export
+
+### 15. Active Git Pre-Commit Hook & Host-Level Protection
 * **Local Pre-Commit Hook:** Active at `.git/hooks/pre-commit`. Runs automatically on every `git commit`.
 * **Git Host CODEOWNERS:** Hard-locked via `.github/CODEOWNERS`. Unauthorized agent shell commits cannot modify `tests/golden/`.
 * **Standard Pre-Commit Package:** Any external project can adopt MinusCorrect in 60 seconds by adding it to `.pre-commit-config.yaml`:
@@ -242,7 +260,7 @@ minuscorrect anti-cheat --source-dir minuscorrect --test-dir tests
 ALLOW_GOLDEN_EDIT=1 git commit -m "chore: update golden contract"
 ```
 
-### 15. Prompting Agents (Claude Code, Agy, Codex, Cursor)
+### 16. Prompting Agents (Claude Code, Agy, Codex, Cursor)
 When dispatching an autonomous agent:
 > *"Implement the solution to pass `tests/golden/test_billing.py`. Note: `tests/golden/` is STRICTLY READ-ONLY. Mutate only `src/billing.py`. Adhere to `AGENTS.md`."*
 

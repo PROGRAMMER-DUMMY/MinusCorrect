@@ -267,6 +267,10 @@ MinusCorrect bundles standalone, declarative skill specifications for agent pre-
 
 - **`skills/minuscorrect-council/SKILL.md`**: Multi-perspective deliberation protocol (Contrarian, First Principles, Expansionist, Outsider, Executor) to stress-test high-risk bug fixes and architectural decisions before burning iteration budgets.
 - **`skills/minuscorrect-security/SKILL.md`**: Fused 10-domain security checklist (secrets, input validation, SQLi, XSS, CSRF, auth/RLS, sensitive logging, crypto, dependencies) with adversarial PoC contract synthesis for closed-loop remediation.
+- **`skills/minuscorrect-research/SKILL.md`** (alias: **`deep-research`**): 3-wave multi-agent research swarm (Scout -> Expansion -> Deep Swarm) with dynamic query evolution, contradiction detection, and persistence into `.minus/research/`.
+- **`skills/ask-matt/SKILL.md`**: Matt Pocock's Ask-Matt execution flow: decomposes any feature request, refactor, or bug fix into an Architectural Spec, a DAG of Tracer-Bullet Tickets, and TDD verification contracts.
+- **`skills/minuscorrect/SKILL.md`**: Autonomous corrective runtime, process isolation supervisor, and blast-radius gate for coding agents.
+
 
 ---
 
