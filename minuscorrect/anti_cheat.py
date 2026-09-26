@@ -497,4 +497,78 @@ def add_banned_anti_pattern(literal: str, config_path: Optional[Path] = None) ->
     return False
 
 
+def harvest_corpus_anti_patterns(
+    target_path: Path,
+    config_path: Optional[Path] = None,
+    min_length: int = 5,
+) -> List[str]:
+    """
+    Automatically extracts benchmark fixture tokens, document keys, and dataset headers
+    from benchmark corpus files (e.g. sec100p_corpus.py, benchmarks/, fixtures/)
+    and registers them into .minus/anti_patterns.json.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    discovered: Set[str] = set()
+
+    files_to_scan: List[Path] = []
+    if target_path.is_file():
+        files_to_scan.append(target_path)
+    elif target_path.is_dir():
+        for ext in ("*.py", "*.json", "*.yaml", "*.yml"):
+            files_to_scan.extend(target_path.rglob(ext))
+
+    stopwords = {
+        "true", "false", "none", "null", "self", "args", "kwargs", "return",
+        "format", "string", "number", "boolean", "object", "array", "value",
+        "index", "count", "items", "keys", "values", "params", "result",
+        "output", "input", "error", "message", "status", "success", "failed",
+        "default", "config", "path", "file", "test", "tests", "benchmark",
+    }
+
+    for f in files_to_scan:
+        try:
+            content = f.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        if f.suffix == ".py":
+            try:
+                tree = ast.parse(content)
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                        val = node.value.strip()
+                        if len(val) >= min_length and val.lower() not in stopwords:
+                            if any(c in val for c in ("_", "-", " ", "/")) or len(val) >= 8:
+                                discovered.add(val)
+            except SyntaxError:
+                pass
+        elif f.suffix == ".json":
+            try:
+                data = json.loads(content)
+                def extract_json_keys(obj: Any) -> None:
+                    if isinstance(obj, dict):
+                        for k, v in obj.items():
+                            if isinstance(k, str) and len(k) >= min_length and k.lower() not in stopwords:
+                                discovered.add(k)
+                            extract_json_keys(v)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            if isinstance(item, str) and len(item) >= min_length and item.lower() not in stopwords:
+                                if any(c in item for c in ("_", "-", " ", "/")) or len(item) >= 8:
+                                    discovered.add(item)
+                            else:
+                                extract_json_keys(item)
+                extract_json_keys(data)
+            except Exception:
+                pass
+
+    newly_added: List[str] = []
+    for token in sorted(discovered):
+        if add_banned_anti_pattern(token, config_path=config_path):
+            newly_added.append(token)
+
+    return newly_added
+
+
+
 

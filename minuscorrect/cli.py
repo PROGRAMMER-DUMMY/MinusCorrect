@@ -158,6 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
     anti_cheat_parser.add_argument("--source-dir", default="minuscorrect", help="Source code directory (default: minuscorrect)")
     anti_cheat_parser.add_argument("--test-dir", default="tests", help="Tests directory (default: tests)")
     anti_cheat_parser.add_argument("--ban", help="Register a banned benchmark fixture token or anti-pattern literal into .minus/anti_patterns.json")
+    anti_cheat_parser.add_argument("--harvest", help="Automatically harvest benchmark fixture keys and headers from a corpus file or directory (e.g. sec100p_corpus.py)")
     anti_cheat_parser.add_argument("--list-banned", action="store_true", help="List all currently registered banned benchmark tokens")
     anti_cheat_parser.add_argument("--json", action="store_true", help="Output audit report in JSON format")
 
@@ -903,8 +904,22 @@ def handle_anti_cheat(args: argparse.Namespace) -> int:
     from minuscorrect.anti_cheat import (
         add_banned_anti_pattern,
         audit_against_benchmark_cheats,
+        harvest_corpus_anti_patterns,
         load_banned_anti_patterns,
     )
+
+    if getattr(args, "harvest", None):
+        target = Path(args.harvest)
+        if not target.exists():
+            print(f"[ERROR] Harvest target '{target}' does not exist.", file=sys.stderr)
+            return 1
+        new_tokens = harvest_corpus_anti_patterns(target)
+        print(f"[SUCCESS] Harvested {len(new_tokens)} new benchmark fixture anti-patterns from {target.name}:")
+        for token in new_tokens[:15]:
+            print(f"  + \"{token}\"")
+        if len(new_tokens) > 15:
+            print(f"  ... and {len(new_tokens) - 15} more registered in .minus/anti_patterns.json")
+        return 0
 
     if getattr(args, "ban", None):
         literal = args.ban.strip()
