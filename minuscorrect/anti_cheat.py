@@ -370,17 +370,17 @@ def audit_against_benchmark_cheats(
     # 3. Dynamic user-defined custom checkers from .minus/checkers/*.py
     custom_checkers = load_custom_checkers(checkers_dir)
     if custom_checkers:
-        for tf in test_files:
+        for target_file in (source_files + test_files):
             try:
-                content = tf.read_text(encoding="utf-8", errors="ignore")
+                content = target_file.read_text(encoding="utf-8", errors="ignore")
                 for fn in custom_checkers:
                     try:
-                        res = fn(content, str(tf.name))
+                        res = fn(content, str(target_file.name))
                         if isinstance(res, list):
                             report.violations.extend(res)
                     except TypeError:
                         try:
-                            res = fn(content, str(tf.name), True)
+                            res = fn(content, str(target_file.name), True)
                             if isinstance(res, list):
                                 report.violations.extend(res)
                         except Exception:
@@ -410,8 +410,8 @@ def detect_banned_benchmark_fixtures(
     source_path: str = "source.py",
 ) -> List[CheatViolation]:
     """
-    Detects when source code embeds banned benchmark fixture keys (e.g. 'sec_10k_p3_cash_flows')
-    or hardcoded table lookups designed to pass benchmarks without general extraction logic.
+    Detects when executable source code embeds banned benchmark fixture keys or
+    hardcoded table lookups designed to pass benchmarks without general extraction logic.
     # verifies: tests/unit/test_anti_cheat.py
     """
     violations: List[CheatViolation] = []
@@ -423,7 +423,18 @@ def detect_banned_benchmark_fixtures(
     except SyntaxError:
         return violations
 
+    # Identify and exclude docstring constants
+    docstring_nodes = set()
+    for parent in ast.walk(tree):
+        if isinstance(parent, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if parent.body and isinstance(parent.body[0], ast.Expr):
+                val = parent.body[0].value
+                if isinstance(val, ast.Constant) and isinstance(val.value, str):
+                    docstring_nodes.add(val)
+
     for node in ast.walk(tree):
+        if node in docstring_nodes:
+            continue
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             for banned in banned_literals:
                 if banned.lower() in node.value.lower():

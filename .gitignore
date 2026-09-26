@@ -23,7 +23,9 @@ build/
 
 # MinusCorrect runtime state
 .minuscorrect/
-.minus/
+.minus/sessions/
+.minus/diffs/
+.minus/incidents/
 .pytest_temp/
 .pytest_cache/
 

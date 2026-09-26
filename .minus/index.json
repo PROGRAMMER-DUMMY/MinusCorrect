@@ -1,0 +1,272 @@
+{
+  "version": "1.0",
+  "created_at": "2026-09-22T21:23:13.340803+00:00",
+  "updated_at": "2026-09-26T07:10:35.286815+00:00",
+  "tickets": {
+    "T-001": {
+      "id": "T-001",
+      "title": "Verify RLS policies",
+      "role": "Security & Policy Auditor",
+      "status": "completed",
+      "blocked_by": [],
+      "blocks": [],
+      "file": "tickets/completed/T-001.md",
+      "created_at": "2026-09-22T21:23:17.645247+00:00",
+      "closed_at": "2026-09-22T21:23:30.228963+00:00",
+      "receipt": {
+        "commit_sha": "9a8b7c6d",
+        "test_command": "pytest tests/unit/",
+        "exit_code": 0,
+        "verified_at": "2026-09-22T21:23:30.228966+00:00",
+        "specialist": "Security & Policy Auditor",
+        "integrity_hash": ""
+      }
+    },
+    "TICKET-01": {
+      "id": "TICKET-01",
+      "title": "Contract Definition & Test Staging",
+      "role": "Distributed Systems Engineer",
+      "status": "completed",
+      "blocked_by": [],
+      "blocks": [
+        "TICKET-02"
+      ],
+      "file": "tickets/completed/TICKET-01.md",
+      "created_at": "2026-09-22T21:24:22.954985+00:00",
+      "closed_at": "2026-09-24T04:58:50.744656+00:00",
+      "receipt": {
+        "commit_sha": "HEAD",
+        "test_command": "minuscorrect verify",
+        "exit_code": 0,
+        "verified_at": "2026-09-24T04:58:50.744660+00:00",
+        "specialist": "Distributed Systems Engineer",
+        "integrity_hash": ""
+      }
+    },
+    "TICKET-02": {
+      "id": "TICKET-02",
+      "title": "Surgical Implementation & Sandboxed Verification",
+      "role": "Process Isolation SRE",
+      "status": "completed",
+      "blocked_by": [
+        "TICKET-01"
+      ],
+      "blocks": [
+        "TICKET-03"
+      ],
+      "file": "tickets/completed/TICKET-02.md",
+      "created_at": "2026-09-22T21:24:22.957427+00:00",
+      "closed_at": "2026-09-24T04:59:07.326884+00:00",
+      "receipt": {
+        "commit_sha": "HEAD",
+        "test_command": "minuscorrect verify",
+        "exit_code": 0,
+        "verified_at": "2026-09-24T04:59:07.326888+00:00",
+        "specialist": "Process Isolation SRE",
+        "integrity_hash": ""
+      }
+    },
+    "TICKET-03": {
+      "id": "TICKET-03",
+      "title": "Pre-Commit Integrity Audit & Clean-up",
+      "role": "TDD & Verification Lead",
+      "status": "completed",
+      "blocked_by": [
+        "TICKET-02"
+      ],
+      "blocks": [],
+      "file": "tickets/completed/TICKET-03.md",
+      "created_at": "2026-09-22T21:24:22.968817+00:00",
+      "closed_at": "2026-09-24T04:59:24.509677+00:00",
+      "receipt": {
+        "commit_sha": "HEAD",
+        "test_command": "minuscorrect verify",
+        "exit_code": 0,
+        "verified_at": "2026-09-24T04:59:24.509680+00:00",
+        "specialist": "TDD & Verification Lead",
+        "integrity_hash": ""
+      }
+    },
+    "T-002": {
+      "id": "T-002",
+      "title": "Contract Definition & Acceptance Staging for build a webhook listener for Stripe paym",
+      "role": "Security & Policy Auditor",
+      "status": "open",
+      "blocked_by": [],
+      "blocks": [
+        "T-003"
+      ],
+      "file": "tickets/open/T-002.md",
+      "created_at": "2026-09-24T05:45:07.950043+00:00",
+      "closed_at": null
+    },
+    "T-003": {
+      "id": "T-003",
+      "title": "Surgical Implementation & Invariant Enforcement: build a webhook listener for Stripe paym",
+      "role": "Distributed Systems Engineer",
+      "status": "open",
+      "blocked_by": [
+        "T-002"
+      ],
+      "blocks": [
+        "T-004"
+      ],
+      "file": "tickets/open/T-003.md",
+      "created_at": "2026-09-24T05:45:07.951363+00:00",
+      "closed_at": null
+    },
+    "T-004": {
+      "id": "T-004",
+      "title": "Systemic Integrity Audit, Debug Tag Purge & PR Export",
+      "role": "TDD & Verification Lead",
+      "status": "open",
+      "blocked_by": [
+        "T-003"
+      ],
+      "blocks": [],
+      "file": "tickets/open/T-004.md",
+      "created_at": "2026-09-24T05:45:07.959112+00:00",
+      "closed_at": null
+    }
+  },
+  "incidents": {},
+  "research": {
+    "RES-001": {
+      "id": "RES-001",
+      "topic": "PostgreSQL Row Level Security Bypass",
+      "created_at": "2026-09-24T05:16:20.324428+00:00",
+      "file": "research/RES-001.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-002": {
+      "id": "RES-002",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-24T05:17:00.963992+00:00",
+      "file": "research/RES-002.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-003": {
+      "id": "RES-003",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-24T05:17:19.602433+00:00",
+      "file": "research/RES-003.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-004": {
+      "id": "RES-004",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-24T05:46:19.524787+00:00",
+      "file": "research/RES-004.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-005": {
+      "id": "RES-005",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-24T05:49:37.837600+00:00",
+      "file": "research/RES-005.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-006": {
+      "id": "RES-006",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-24T07:43:48.328988+00:00",
+      "file": "research/RES-006.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-007": {
+      "id": "RES-007",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-24T08:15:39.645343+00:00",
+      "file": "research/RES-007.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-008": {
+      "id": "RES-008",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-25T13:59:59.176601+00:00",
+      "file": "research/RES-008.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-009": {
+      "id": "RES-009",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-26T07:10:35.286793+00:00",
+      "file": "research/RES-009.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    }
+  },
+  "rules": {
+    "RULE-001": {
+      "id": "RULE-001",
+      "title": "Zero Secret & PII Logging",
+      "scope": "security",
+      "enforcement": "strict",
+      "file": "rules/RULE-001.md",
+      "instruction": "Never write raw secrets, API tokens, card numbers, or customer PII to terminal logs or exceptions. Defang before emission.",
+      "created_at": "2026-09-24T05:45:07.896793+00:00"
+    },
+    "RULE-002": {
+      "id": "RULE-002",
+      "title": "Mutating Request Idempotency",
+      "scope": "distributed",
+      "enforcement": "strict",
+      "file": "rules/RULE-002.md",
+      "instruction": "All state-mutating handlers and external webhook consumers must enforce unique Idempotency-Key validation to prevent duplicate processing.",
+      "created_at": "2026-09-24T05:45:07.914119+00:00"
+    },
+    "RULE-003": {
+      "id": "RULE-003",
+      "title": "Ephemeral Worktree Isolation",
+      "scope": "process",
+      "enforcement": "strict",
+      "file": "rules/RULE-003.md",
+      "instruction": "All test executions and agent fixes must run inside isolated ephemeral git worktrees with ambient credentials stripped.",
+      "created_at": "2026-09-24T05:45:07.926335+00:00"
+    },
+    "RULE-004": {
+      "id": "RULE-004",
+      "title": "Refero Design System Invariant",
+      "scope": "frontend",
+      "enforcement": "strict",
+      "file": "rules/RULE-004.md",
+      "instruction": "All UI elements must utilize Tailwind CSS v4 design tokens and CSS custom properties with WCAG AA compliance.",
+      "created_at": "2026-09-24T05:45:07.939402+00:00"
+    }
+  }
+}
