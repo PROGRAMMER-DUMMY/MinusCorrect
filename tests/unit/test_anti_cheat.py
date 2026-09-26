@@ -141,3 +141,45 @@ def test_check_anti_cheat_verifier() -> None:
     assert ok
     assert "clean" in msg
 
+
+def test_load_custom_checkers(tmp_path: Path) -> None:
+    from minuscorrect.anti_cheat import audit_against_benchmark_cheats, load_custom_checkers
+
+    checkers_dir = tmp_path / "checkers"
+    checkers_dir.mkdir()
+
+    # Create a custom checker that flags any test containing 'banned_helper'
+    custom_checker_code = """
+from minuscorrect.anti_cheat import CheatViolation
+
+def check_banned_helper(content, path):
+    violations = []
+    if 'banned_helper' in content:
+        violations.append(CheatViolation(
+            violation_type='BANNED_HELPER',
+            file_path=path,
+            line_number=1,
+            severity='Blocks launch',
+            description='Use of banned_helper is prohibited in this repository.',
+            snippet='banned_helper()',
+        ))
+    return violations
+"""
+    (checkers_dir / "check_helpers.py").write_text(custom_checker_code, encoding="utf-8")
+
+    checkers = load_custom_checkers(checkers_dir)
+    assert len(checkers) == 1
+
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+
+    # Test file violating custom checker
+    (test_dir / "test_custom.py").write_text("def test_x(): banned_helper(); assert 1 == 1\n", encoding="utf-8")
+
+    report = audit_against_benchmark_cheats(src_dir, test_dir, checkers_dir=checkers_dir)
+    assert not report.passed
+    assert any(v.violation_type == "BANNED_HELPER" for v in report.violations)
+
+

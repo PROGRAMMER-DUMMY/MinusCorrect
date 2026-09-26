@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import asdict, dataclass, field
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -293,9 +294,41 @@ def detect_vacuous_assertions(test_code: str, test_path: str = "test.py") -> Lis
     return violations
 
 
+def load_custom_checkers(checkers_dir: Optional[Path] = None) -> List[Any]:
+    """
+    Dynamically loads user-defined custom AST checkers from .minus/checkers/*.py.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    if checkers_dir is None:
+        checkers_dir = Path.cwd() / ".minus" / "checkers"
+
+    if not checkers_dir.is_dir():
+        return []
+
+    custom_checkers = []
+    for py_file in sorted(checkers_dir.glob("*.py")):
+        if py_file.name.startswith("__"):
+            continue
+        try:
+            module_name = f"minus_custom_checker_{py_file.stem}"
+            spec = importlib.util.spec_from_file_location(module_name, py_file)
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                for attr_name in dir(mod):
+                    if attr_name.startswith(("check_", "detect_")):
+                        fn = getattr(mod, attr_name)
+                        if callable(fn):
+                            custom_checkers.append(fn)
+        except Exception:
+            pass
+    return custom_checkers
+
+
 def audit_against_benchmark_cheats(
     source_dir: Path,
     test_dir: Path,
+    checkers_dir: Optional[Path] = None,
 ) -> AntiCheatReport:
     """
     Performs full repository anti-cheating audit across source and test files.
@@ -334,6 +367,30 @@ def audit_against_benchmark_cheats(
         except OSError:
             pass
 
+    # 3. Dynamic user-defined custom checkers from .minus/checkers/*.py
+    custom_checkers = load_custom_checkers(checkers_dir)
+    if custom_checkers:
+        for tf in test_files:
+            try:
+                content = tf.read_text(encoding="utf-8", errors="ignore")
+                for fn in custom_checkers:
+                    try:
+                        res = fn(content, str(tf.name))
+                        if isinstance(res, list):
+                            report.violations.extend(res)
+                    except TypeError:
+                        try:
+                            res = fn(content, str(tf.name), True)
+                            if isinstance(res, list):
+                                report.violations.extend(res)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+            except OSError:
+                pass
+
     report.passed = not any(v.severity == "Blocks launch" for v in report.violations)
     return report
+
 
