@@ -390,7 +390,100 @@ def audit_against_benchmark_cheats(
             except OSError:
                 pass
 
+    # 4. Check for banned benchmark fixtures and anti-patterns (.minus/anti_patterns.json)
+    banned_tokens = load_banned_anti_patterns()
+    if banned_tokens:
+        for sf in source_files:
+            try:
+                content = sf.read_text(encoding="utf-8", errors="ignore")
+                report.violations.extend(detect_banned_benchmark_fixtures(content, banned_tokens, source_path=str(sf.name)))
+            except OSError:
+                pass
+
     report.passed = not any(v.severity == "Blocks launch" for v in report.violations)
     return report
+
+
+def detect_banned_benchmark_fixtures(
+    source_code: str,
+    banned_literals: Set[str],
+    source_path: str = "source.py",
+) -> List[CheatViolation]:
+    """
+    Detects when source code embeds banned benchmark fixture keys (e.g. 'sec_10k_p3_cash_flows')
+    or hardcoded table lookups designed to pass benchmarks without general extraction logic.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    violations: List[CheatViolation] = []
+    if not banned_literals:
+        return violations
+
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return violations
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            for banned in banned_literals:
+                if banned.lower() in node.value.lower():
+                    violations.append(CheatViolation(
+                        violation_type="BANNED_BENCHMARK_FIXTURE_LEAK",
+                        file_path=source_path,
+                        line_number=node.lineno,
+                        severity="Blocks launch",
+                        description=(
+                            f"Source code contains banned benchmark fixture key '{banned}'. "
+                            f"Embedding hardcoded benchmark answer tables or test tokens is prohibited."
+                        ),
+                        snippet=ast.unparse(node) if hasattr(ast, "unparse") else node.value,
+                    ))
+                    break
+    return violations
+
+
+def load_banned_anti_patterns(config_path: Optional[Path] = None) -> Set[str]:
+    """Load banned anti-patterns and benchmark fixture keys from .minus/anti_patterns.json."""
+    if config_path is None:
+        config_path = Path.cwd() / ".minus" / "anti_patterns.json"
+
+    banned: Set[str] = set()
+    if config_path.is_file():
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                banned.update(data.get("banned_literals", []))
+            elif isinstance(data, list):
+                banned.update(data)
+        except Exception:
+            pass
+    return banned
+
+
+def add_banned_anti_pattern(literal: str, config_path: Optional[Path] = None) -> bool:
+    """
+    Add a banned benchmark fixture token or anti-pattern to .minus/anti_patterns.json.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    if config_path is None:
+        minus_dir = Path.cwd() / ".minus"
+        minus_dir.mkdir(parents=True, exist_ok=True)
+        config_path = minus_dir / "anti_patterns.json"
+
+    data: Dict[str, Any] = {"banned_literals": []}
+    if config_path.is_file():
+        try:
+            loaded = json.loads(config_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict) and "banned_literals" in loaded:
+                data = loaded
+        except Exception:
+            pass
+
+    if literal not in data["banned_literals"]:
+        data["banned_literals"].append(literal)
+        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return True
+    return False
+
 
 

@@ -157,6 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
     anti_cheat_parser = subparsers.add_parser("anti-cheat", help="Audit repository against benchmark overfitting, hardcoded bypasses, and tautologies")
     anti_cheat_parser.add_argument("--source-dir", default="minuscorrect", help="Source code directory (default: minuscorrect)")
     anti_cheat_parser.add_argument("--test-dir", default="tests", help="Tests directory (default: tests)")
+    anti_cheat_parser.add_argument("--ban", help="Register a banned benchmark fixture token or anti-pattern literal into .minus/anti_patterns.json")
+    anti_cheat_parser.add_argument("--list-banned", action="store_true", help="List all currently registered banned benchmark tokens")
     anti_cheat_parser.add_argument("--json", action="store_true", help="Output audit report in JSON format")
 
     # Command: research
@@ -898,7 +900,31 @@ def handle_route(args: argparse.Namespace) -> int:
 
 
 def handle_anti_cheat(args: argparse.Namespace) -> int:
-    from minuscorrect.anti_cheat import audit_against_benchmark_cheats
+    from minuscorrect.anti_cheat import (
+        add_banned_anti_pattern,
+        audit_against_benchmark_cheats,
+        load_banned_anti_patterns,
+    )
+
+    if getattr(args, "ban", None):
+        literal = args.ban.strip()
+        added = add_banned_anti_pattern(literal)
+        if added:
+            print(f"[SUCCESS] Registered banned anti-pattern '{literal}' in .minus/anti_patterns.json")
+        else:
+            print(f"[INFO] Banned anti-pattern '{literal}' already present in .minus/anti_patterns.json")
+        return 0
+
+    if getattr(args, "list_banned", False):
+        banned = load_banned_anti_patterns()
+        if not banned:
+            print("[INFO] No banned anti-patterns registered in .minus/anti_patterns.json")
+        else:
+            print(f"Registered Banned Benchmark Fixture Tokens ({len(banned)} total):")
+            for token in sorted(banned):
+                print(f"  - \"{token}\"")
+        return 0
+
     src_dir = Path(args.source_dir)
     test_dir = Path(args.test_dir)
     if not src_dir.exists():
