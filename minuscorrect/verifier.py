@@ -218,7 +218,29 @@ def check_unverified_claims(strict: bool = False) -> Tuple[bool, str]:
     return True, "Docstring claims clean."
 
 
-def verify_all(auto_fix: bool = False, strict_docstrings: bool = False) -> bool:
+def check_anti_cheat(strict: bool = False) -> Tuple[bool, str]:
+    """
+    Audit tests against benchmark cheating, empty tests, tautologies, and overfitting.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    from minuscorrect.anti_cheat import audit_against_benchmark_cheats
+    repo_root = Path.cwd()
+    src_dir = repo_root / "minuscorrect" if (repo_root / "minuscorrect").is_dir() else repo_root / "src"
+    test_dir = repo_root / "tests"
+    if not test_dir.is_dir():
+        return True, "No tests directory found."
+
+    report = audit_against_benchmark_cheats(src_dir, test_dir)
+    if not report.passed:
+        violations_text = "\n  ".join(
+            f"[{v.violation_type}] {v.file_path}:{v.line_number} - {v.description}"
+            for v in report.violations
+        )
+        return False, f"[ERROR] Anti-Cheat Audit Failed ({len(report.violations)} violation(s)):\n  {violations_text}"
+    return True, "Anti-cheat audit clean."
+
+
+def verify_all(auto_fix: bool = False, strict_docstrings: bool = False, enforce_anti_cheat: bool = False) -> bool:
     """Executes full verification suite. Returns True if all checks pass."""
     print(f"[INFO] Running Systemic Integrity Pre-Commit Verification...{' (Auto-Fix Enabled)' if auto_fix else ''}")
 
@@ -242,5 +264,12 @@ def verify_all(auto_fix: bool = False, strict_docstrings: bool = False) -> bool:
         print(claims_msg, file=sys.stderr)
         return False
 
+    if enforce_anti_cheat or strict_docstrings or os.environ.get("STRICT_ANTI_CHEAT") == "1":
+        cheat_ok, cheat_msg = check_anti_cheat(strict=True)
+        if not cheat_ok:
+            print(cheat_msg, file=sys.stderr)
+            return False
+
     print("[SUCCESS] Systemic Integrity Verification Passed!")
     return True
+

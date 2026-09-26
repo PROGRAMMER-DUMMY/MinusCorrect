@@ -75,3 +75,69 @@ def test_full_anti_cheat_audit(tmp_path: Path) -> None:
     report = audit_against_benchmark_cheats(src_dir, test_dir)
     assert report.passed
     assert len(report.violations) == 0
+
+
+def test_detect_assert_free_tests() -> None:
+    from minuscorrect.anti_cheat import detect_assert_free_tests
+
+    test_code = """
+def test_no_asserts():
+    x = 10
+    y = x + 20
+
+def test_with_asserts():
+    assert 1 == 1
+"""
+    violations = detect_assert_free_tests(test_code)
+    assert len(violations) == 1
+    assert violations[0].violation_type == "ASSERT_FREE_TEST"
+    assert "test_no_asserts" in violations[0].description
+
+
+def test_detect_test_exception_swallowing() -> None:
+    from minuscorrect.anti_cheat import detect_test_exception_swallowing
+
+    test_code = """
+def test_swallow():
+    try:
+        dangerous_call()
+    except Exception:
+        pass
+
+def test_reraise():
+    try:
+        dangerous_call()
+    except Exception:
+        raise
+"""
+    violations = detect_test_exception_swallowing(test_code)
+    assert len(violations) == 1
+    assert violations[0].violation_type == "TEST_EXCEPTION_SWALLOWING"
+    assert "test_swallow" in violations[0].description
+
+
+def test_detect_vacuous_assertions() -> None:
+    from minuscorrect.anti_cheat import detect_vacuous_assertions
+
+    test_code = """
+def test_vacuous():
+    items = [1, 2, 3]
+    assert len(items) >= 0
+    assert isinstance(items, object)
+
+def test_valid():
+    items = [1, 2, 3]
+    assert len(items) == 3
+"""
+    violations = detect_vacuous_assertions(test_code)
+    assert len(violations) == 2
+    assert all(v.violation_type == "VACUOUS_ASSERTION" for v in violations)
+
+
+def test_check_anti_cheat_verifier() -> None:
+    from minuscorrect.verifier import check_anti_cheat
+
+    ok, msg = check_anti_cheat(strict=True)
+    assert ok
+    assert "clean" in msg
+

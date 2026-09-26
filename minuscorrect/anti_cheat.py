@@ -178,6 +178,121 @@ def detect_tautological_assertions(test_code: str, test_path: str = "test.py") -
     return violations
 
 
+def detect_assert_free_tests(test_code: str, test_path: str = "test.py") -> List[CheatViolation]:
+    """
+    Detects test functions that contain zero assertions or pytest checks.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    violations: List[CheatViolation] = []
+    try:
+        tree = ast.parse(test_code)
+    except SyntaxError:
+        return violations
+
+    for func in ast.walk(tree):
+        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)) and func.name.startswith("test_"):
+            has_assert = False
+            for node in ast.walk(func):
+                if isinstance(node, ast.Assert):
+                    has_assert = True
+                    break
+                elif isinstance(node, ast.Call):
+                    call_name = ""
+                    if isinstance(node.func, ast.Name):
+                        call_name = node.func.id
+                    elif isinstance(node.func, ast.Attribute):
+                        call_name = node.func.attr
+                    if any(kw in call_name.lower() for kw in ("raises", "assert", "fail", "warns", "deprecated")):
+                        has_assert = True
+                        break
+            if not has_assert:
+                violations.append(CheatViolation(
+                    violation_type="ASSERT_FREE_TEST",
+                    file_path=test_path,
+                    line_number=func.lineno,
+                    severity="Blocks launch",
+                    description=f"Test function '{func.name}' contains zero assert or verification statements; does not verify behavior.",
+                    snippet=f"def {func.name}(...):",
+                ))
+    return violations
+
+
+def detect_test_exception_swallowing(test_code: str, test_path: str = "test.py") -> List[CheatViolation]:
+    """
+    Detects test functions that catch exceptions and silently pass or return.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    violations: List[CheatViolation] = []
+    try:
+        tree = ast.parse(test_code)
+    except SyntaxError:
+        return violations
+
+    for func in ast.walk(tree):
+        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)) and func.name.startswith("test_"):
+            for node in ast.walk(func):
+                if isinstance(node, ast.Try):
+                    for handler in node.handlers:
+                        is_swallowed = False
+                        for stmt in handler.body:
+                            if isinstance(stmt, ast.Pass):
+                                is_swallowed = True
+                            elif isinstance(stmt, ast.Return) and stmt.value is None:
+                                is_swallowed = True
+                            elif isinstance(stmt, ast.Raise):
+                                is_swallowed = False
+                                break
+                        if is_swallowed:
+                            violations.append(CheatViolation(
+                                violation_type="TEST_EXCEPTION_SWALLOWING",
+                                file_path=test_path,
+                                line_number=handler.lineno,
+                                severity="Blocks launch",
+                                description=f"Test function '{func.name}' swallows exception with pass/return in except block, masking potential test failure.",
+                                snippet=ast.unparse(handler) if hasattr(ast, "unparse") else "except: pass",
+                            ))
+    return violations
+
+
+def detect_vacuous_assertions(test_code: str, test_path: str = "test.py") -> List[CheatViolation]:
+    """
+    Detects vacuous, mathematically unfalsifiable assertions (e.g. assert len(...) >= 0).
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    violations: List[CheatViolation] = []
+    try:
+        tree = ast.parse(test_code)
+    except SyntaxError:
+        return violations
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assert):
+            if isinstance(node.test, ast.Compare):
+                left = node.test.left
+                if isinstance(left, ast.Call) and isinstance(left.func, ast.Name) and left.func.id == "len":
+                    for op, comp in zip(node.test.ops, node.test.comparators):
+                        if isinstance(op, ast.GtE) and isinstance(comp, ast.Constant) and comp.value == 0:
+                            violations.append(CheatViolation(
+                                violation_type="VACUOUS_ASSERTION",
+                                file_path=test_path,
+                                line_number=node.lineno,
+                                severity="Blocks launch",
+                                description="Vacuous assertion 'assert len(...) >= 0' detected; mathematically always true in Python.",
+                                snippet=ast.unparse(node) if hasattr(ast, "unparse") else "assert len(...) >= 0",
+                            ))
+            elif isinstance(node.test, ast.Call) and isinstance(node.test.func, ast.Name) and node.test.func.id == "isinstance":
+                if len(node.test.args) >= 2 and isinstance(node.test.args[1], ast.Name) and node.test.args[1].id == "object":
+                    violations.append(CheatViolation(
+                        violation_type="VACUOUS_ASSERTION",
+                        file_path=test_path,
+                        line_number=node.lineno,
+                        severity="Blocks launch",
+                        description="Vacuous assertion 'assert isinstance(..., object)' detected; all types inherit from object.",
+                        snippet=ast.unparse(node) if hasattr(ast, "unparse") else "assert isinstance(..., object)",
+                    ))
+    return violations
+
+
 def audit_against_benchmark_cheats(
     source_dir: Path,
     test_dir: Path,
@@ -187,17 +302,19 @@ def audit_against_benchmark_cheats(
     # verifies: tests/unit/test_anti_cheat.py
     """
     report = AntiCheatReport()
-    source_files = list(source_dir.glob("**/*.py"))
-    test_files = list(test_dir.glob("**/*.py"))
+    source_files = list(source_dir.glob("**/*.py")) if source_dir.is_dir() else []
+    test_files = list(test_dir.glob("**/*.py")) if test_dir.is_dir() else []
 
     report.files_inspected = len(source_files) + len(test_files)
 
-    # 1. Tautological assertions in test files
+    # 1. Tautological assertions, empty tests, exception swallowing, vacuous assertions in test files
     for tf in test_files:
         try:
             content = tf.read_text(encoding="utf-8", errors="ignore")
-            tautologies = detect_tautological_assertions(content, test_path=str(tf.name))
-            report.violations.extend(tautologies)
+            report.violations.extend(detect_tautological_assertions(content, test_path=str(tf.name)))
+            report.violations.extend(detect_assert_free_tests(content, test_path=str(tf.name)))
+            report.violations.extend(detect_test_exception_swallowing(content, test_path=str(tf.name)))
+            report.violations.extend(detect_vacuous_assertions(content, test_path=str(tf.name)))
         except OSError:
             pass
 
@@ -219,3 +336,4 @@ def audit_against_benchmark_cheats(
 
     report.passed = not any(v.severity == "Blocks launch" for v in report.violations)
     return report
+
