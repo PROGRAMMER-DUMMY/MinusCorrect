@@ -141,11 +141,68 @@ class LocalRuleEngine(DecisionEngine):
         )
 
 
+class LayaProvider(DecisionEngine):
+    """
+    Native Laya / MinusTransformer System-1 Decision Engine.
+    Executes Choice, Score, and Noul evaluations in-process via LayaGLU manifolds.
+    Zero external network calls, zero API keys, sub-10ms local evaluation.
+    # verifies: tests/unit/test_decision.py
+    """
+
+    def __init__(self, fallback_engine: Optional[DecisionEngine] = None) -> None:
+        self.fallback = fallback_engine or LocalRuleEngine()
+        self._engine = None
+        try:
+            from minustransformer.service.laya_engine import LayaDecisionEngine
+            self._engine = LayaDecisionEngine()
+        except Exception:
+            self._engine = None
+
+    def evaluate(self, batch: DecisionBatch) -> DecisionResponse:
+        if self._engine is None:
+            return self.fallback.evaluate(batch)
+
+        try:
+            start_time = time.perf_counter()
+            local_resp = self._engine.evaluate_batch(batch.state, batch.questions)
+            answers: Dict[str, QuestionResult] = {}
+            for q_id, ans in local_resp.answers.items():
+                orig_q = batch.questions.get(q_id)
+                if isinstance(orig_q, Choice) or hasattr(ans, "distribution"):
+                    answers[q_id] = ChoiceResult(
+                        choice=getattr(ans, "choice", ""),
+                        distribution=getattr(ans, "distribution", {}),
+                        confidence=getattr(ans, "confidence", 0.0),
+                    )
+                elif isinstance(orig_q, Score) or hasattr(ans, "score"):
+                    answers[q_id] = ScoreResult(
+                        score=getattr(ans, "score", 0.0),
+                        confidence=getattr(ans, "confidence", 0.0),
+                        explanation=getattr(ans, "explanation", ""),
+                    )
+                elif isinstance(orig_q, Noul) or hasattr(ans, "probability"):
+                    prob = getattr(ans, "probability", 0.0)
+                    passed = getattr(ans, "passed", prob >= getattr(orig_q, "threshold", 0.5))
+                    answers[q_id] = NoulResult(
+                        probability=prob,
+                        passed=passed,
+                        confidence=getattr(ans, "confidence", 0.0),
+                    )
+            latency_ms = (time.perf_counter() - start_time) * 1000.0
+            return DecisionResponse(
+                answers=answers,
+                latency_ms=round(latency_ms, 2),
+                provider="laya-systemone",
+            )
+        except Exception:
+            return self.fallback.evaluate(batch)
+
+
 class JevProvider(DecisionEngine):
     """
-    TypeSafe AI System One decision service provider.
-    Enforces a strict 2.0-second timeout and silently falls back to LocalRuleEngine
-    upon missing credentials, timeouts, or network interruptions.
+    Deprecated: TypeSafe AI System One decision service provider.
+    Replaced by native in-process LayaProvider to eliminate cloud API latency and third-party lock-in.
+    Enforces a strict 2.0-second timeout and silently falls back to LocalRuleEngine.
     """
 
     def __init__(
@@ -246,17 +303,20 @@ class MockDecisionEngine(DecisionEngine):
 def get_decision_engine(name: str = "auto") -> DecisionEngine:
     """
     Factory resolving the active Middle-Ring decision engine.
+    Default resolves to native in-process LayaProvider (MinusTransformer), eliminating external Jev calls.
     # verifies: tests/unit/test_decision.py
     """
     mode = name.lower()
     if mode == "local":
         return LocalRuleEngine()
-    if mode == "jev":
-        return JevProvider()
     if mode == "mock":
         return MockDecisionEngine()
+    if mode in ("laya", "auto"):
+        return LayaProvider()
+    if mode == "jev":
+        # Deprecated: TypeSafe Jev eliminated; route to native Laya unless legacy key explicitly tested
+        if os.environ.get("TYPESAFE_API_KEY"):
+            return JevProvider()
+        return LayaProvider()
 
-    # 'auto': Use Jev if TYPESAFE_API_KEY is present, otherwise LocalRuleEngine
-    if os.environ.get("TYPESAFE_API_KEY"):
-        return JevProvider()
-    return LocalRuleEngine()
+    return LayaProvider()

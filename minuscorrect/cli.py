@@ -105,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
     council_parser = subparsers.add_parser("council", help="Convene the 5-advisor LLM Council protocol")
     council_parser.add_argument("query", nargs="?", default=None, help="Architectural question, trade-off, or bug triage dilemma")
     council_parser.add_argument("--json", action="store_true", help="Output council prompt schema in JSON")
-    council_parser.add_argument("--decision-engine", choices=["auto", "local", "jev", "mock"], default="auto", help="Decision engine for council Stage-2 evaluation (default: auto)")
+    council_parser.add_argument("--decision-engine", choices=["auto", "laya", "local", "jev", "mock"], default="auto", help="Decision engine for council Stage-2 evaluation (default: auto -> laya)")
 
     # Command: ask-matt
     ask_matt_parser = subparsers.add_parser("ask-matt", help="Generate Matt Pocock Spec-to-Tickets DAG execution plan")

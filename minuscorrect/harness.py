@@ -55,12 +55,12 @@ def get_superqode_harness_spec() -> Dict[str, Any]:
                 "pre_commit_verifier": "python scripts/verify_integrity.py --fix --strict",
             },
             "decision_service": {
-                "supported_engines": ["local", "jev", "mock"],
-                "default_engine": "local",
+                "supported_engines": ["laya", "local", "mock"],
+                "default_engine": "laya",
                 "primitives": ["Choice", "Score", "Noul"],
-                "jev_systemone": {
-                    "endpoint": "https://api.typesafe.ai/v1/systemone",
-                    "timeout_seconds": 2.0,
+                "laya_systemone": {
+                    "architecture": "MinusTransformer",
+                    "mode": "in-process",
                     "fallback_to_local": True,
                 },
             },

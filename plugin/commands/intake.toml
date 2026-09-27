@@ -1,0 +1,2 @@
+description = "Cognitive Intent Ingestion: extract invariants, auto-register rules, convene council, and write Ask-Matt tickets"
+prompt = "Activate the minuscorrect-intake skill. Ingest the user's intent using 'minuscorrect intake \"<prompt>\"' to automatically extract invariants, register rules, run council deliberation, and scaffold tracer-bullet tickets."

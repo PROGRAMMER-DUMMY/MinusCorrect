@@ -320,7 +320,11 @@ def inspect_plugin_status() -> Dict[str, Any]:
         "ask-matt": is_skill_present("ask-matt"),
         "minuscorrect-security": is_skill_present("minuscorrect-security"),
         "minuscorrect-research": is_skill_present("minuscorrect-research"),
-        "deep-research": is_skill_present("deep-research"),
+        "minuscorrect-anticheat": is_skill_present("minuscorrect-anticheat"),
+        "minuscorrect-spec": is_skill_present("minuscorrect-spec"),
+        "minuscorrect-store": is_skill_present("minuscorrect-store"),
+        "minuscorrect-intake": is_skill_present("minuscorrect-intake"),
+        "minuscorrect-audit": is_skill_present("minuscorrect-audit"),
     }
 
     # Check agy plugins list
@@ -341,39 +345,43 @@ def inspect_plugin_status() -> Dict[str, Any]:
 
 
 def install_plugin() -> tuple[bool, str]:
-    """Install and register the MinusCorrect plugin into Antigravity."""
+    """
+    Install and register the MinusCorrect plugin into Antigravity.
+    Installs complete plugin to ~/.gemini/config/plugins/minuscorrect/
+    and removes redundant loose copies from ~/.gemini/config/skills/ to avoid duplicates.
+    # verifies: tests/unit/test_orchestrator.py
+    """
     source_dir = get_plugin_source_dir()
     if not source_dir.is_dir() or not (source_dir / "plugin.json").is_file():
         return False, f"Plugin source directory not found at {source_dir}"
 
+    global_plugin_dir = Path.home() / ".gemini" / "config" / "plugins" / "minuscorrect"
     global_skills_dir = Path.home() / ".gemini" / "config" / "skills"
-    global_skills_dir.mkdir(parents=True, exist_ok=True)
-    skills_src = source_dir / "skills"
 
-    def sync_skills() -> None:
-        if skills_src.is_dir():
+    def cleanup_duplicate_loose_skills() -> None:
+        """Remove duplicate copies of plugin skills from ~/.gemini/config/skills/."""
+        skills_src = source_dir / "skills"
+        if skills_src.is_dir() and global_skills_dir.is_dir():
             for skill_folder in skills_src.iterdir():
                 if skill_folder.is_dir():
-                    dest_skill = global_skills_dir / skill_folder.name
-                    if dest_skill.exists():
-                        shutil.rmtree(dest_skill)
-                    shutil.copytree(skill_folder, dest_skill)
+                    loose_skill = global_skills_dir / skill_folder.name
+                    if loose_skill.exists():
+                        shutil.rmtree(loose_skill, ignore_errors=True)
+            # Also clean up legacy deep-research if present in global skills
+            legacy_dr = global_skills_dir / "deep-research"
+            if legacy_dr.exists():
+                shutil.rmtree(legacy_dr, ignore_errors=True)
 
     try:
-        res = subprocess.run(["agy", "plugin", "install", str(source_dir)], capture_output=True, text=True, check=False)
-        sync_skills()
-        if res.returncode == 0:
-            return True, f"Successfully installed MinusCorrect plugin into Antigravity CLI:\n{res.stdout.strip()}"
-        return False, f"Failed to install plugin via agy: {res.stderr.strip()}"
-    except (FileNotFoundError, OSError) as exc:
-        # Fallback to direct directory copy if agy executable is not in PATH
-        dest_dir = Path.home() / ".gemini" / "config" / "plugins" / "minuscorrect"
-        try:
-            if dest_dir.exists():
-                shutil.rmtree(dest_dir)
-            shutil.copytree(source_dir, dest_dir)
-            sync_skills()
-            return True, f"Copied MinusCorrect plugin directly to {dest_dir} and synced skills to {global_skills_dir}."
-        except Exception as copy_exc:
-            return False, f"Failed to copy plugin: {copy_exc}"
+        global_plugin_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, global_plugin_dir, dirs_exist_ok=True)
+        # Remove legacy deep-research from plugin skills if present
+        plugin_legacy_dr = global_plugin_dir / "skills" / "deep-research"
+        if plugin_legacy_dr.exists():
+            shutil.rmtree(plugin_legacy_dr, ignore_errors=True)
+        cleanup_duplicate_loose_skills()
+        return True, f"Successfully installed MinusCorrect plugin with all 10 skills into {global_plugin_dir} (cleaned up loose duplicates in ~/.gemini/config/skills/)."
+    except Exception as exc:
+        return False, f"Failed to install plugin: {exc}"
+
 

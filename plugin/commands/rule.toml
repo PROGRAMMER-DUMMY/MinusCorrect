@@ -1,0 +1,2 @@
+description = "Manage .minus/ second-brain project rules and behavioral invariants"
+prompt = "Activate the minuscorrect-store skill. Inspect and register natural language project rules and invariants using 'minuscorrect rule list/view/add'."

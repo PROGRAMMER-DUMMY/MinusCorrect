@@ -1,0 +1,2 @@
+description = "Run 10-domain pre-launch operational and security audit for AI-generated systems"
+prompt = "Activate the minuscorrect-audit skill. Execute 'minuscorrect audit --pre-launch' across the repository to verify secret leaks, Supabase RLS, BOLA/IDOR, Server Action vulnerabilities, and unindexed foreign keys."

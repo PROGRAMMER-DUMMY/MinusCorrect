@@ -1,0 +1,2 @@
+description = "Safely and atomically revert an agent ticket's commit with verification gates"
+prompt = "Activate the minuscorrect-store skill. Safely roll back a completed ticket using 'minuscorrect rollback <ticket-id>' with pre-flight dirty-tree checks and post-revert verification gates."

@@ -1,0 +1,2 @@
+description = "Scaffold complete blueprint specification suite (PRD, TRD, Refero DESIGN, APPFLOW, SCHEMA with RLS, PLAN)"
+prompt = "Activate the minuscorrect-spec skill. Scaffold or generate architecture specifications using 'minuscorrect spec init' or target specific artifacts (prd, trd, design, appflow, schema, plan)."

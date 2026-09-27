@@ -1,0 +1,2 @@
+description = "Audit repository against benchmark overfitting, assert-free tests, and hardcoded cheats"
+prompt = "Activate the minuscorrect-anticheat skill. Run 'minuscorrect anti-cheat' to inspect source and test code for hardcoded bypasses, tautological assertions, swallowed exceptions, or banned benchmark fixture tokens."

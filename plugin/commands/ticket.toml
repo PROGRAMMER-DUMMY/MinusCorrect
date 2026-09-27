@@ -1,0 +1,2 @@
+description = "Manage .minus/ second-brain tickets, receipts, and lifecycle states"
+prompt = "Activate the minuscorrect-store skill. Use 'minuscorrect ticket list/create/view/close' to coordinate tasks across open and completed lifecycle stages."

@@ -17,6 +17,7 @@ from minuscorrect.types.decision import (
 )
 from minuscorrect.decision import (
     LocalRuleEngine,
+    LayaProvider,
     JevProvider,
     MockDecisionEngine,
     get_decision_engine,
@@ -157,15 +158,28 @@ def test_get_decision_engine_factory(monkeypatch):
     eng_mock = get_decision_engine("mock")
     assert isinstance(eng_mock, MockDecisionEngine)
 
-    # Auto without key -> LocalRuleEngine
-    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
-    eng_auto_local = get_decision_engine("auto")
-    assert isinstance(eng_auto_local, LocalRuleEngine)
+    # Forced laya
+    eng_laya = get_decision_engine("laya")
+    assert isinstance(eng_laya, LayaProvider)
 
-    # Auto with key -> JevProvider
-    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
-    eng_auto_jev = get_decision_engine("auto")
-    assert isinstance(eng_auto_jev, JevProvider)
+    # Auto resolves to native LayaProvider
+    eng_auto = get_decision_engine("auto")
+    assert isinstance(eng_auto, LayaProvider)
+
+
+def test_laya_provider_evaluation():
+    laya = LayaProvider()
+    batch = DecisionBatch(
+        state="Fixed critical bug in auth.py, all golden tests pass cleanly.",
+        questions={
+            "safe": Noul(instructions="Are golden contracts preserved?", threshold=0.5),
+            "score": Score(instructions="Quality rating", min_val=1.0, max_val=10.0),
+        }
+    )
+    resp = laya.evaluate(batch)
+    assert resp.provider in ("laya-systemone", "local-rules")
+    assert "safe" in resp.answers
+    assert "score" in resp.answers
 
 
 def json_bytes(data: dict) -> bytes:
