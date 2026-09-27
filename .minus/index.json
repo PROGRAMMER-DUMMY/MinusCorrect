@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "created_at": "2026-09-22T21:23:13.340803+00:00",
-  "updated_at": "2026-09-27T20:15:35.637327+00:00",
+  "updated_at": "2026-09-27T20:28:57.201430+00:00",
   "tickets": {
     "T-001": {
       "id": "T-001",
@@ -91,42 +91,102 @@
       "id": "T-002",
       "title": "Contract Definition & Acceptance Staging for build a webhook listener for Stripe paym",
       "role": "Security & Policy Auditor",
-      "status": "open",
+      "status": "completed",
       "blocked_by": [],
       "blocks": [
         "T-003"
       ],
-      "file": "tickets/open/T-002.md",
+      "file": "tickets/completed/T-002.md",
       "created_at": "2026-09-24T05:45:07.950043+00:00",
-      "closed_at": null
+      "closed_at": "2026-09-27T20:28:45.098120+00:00",
+      "receipt": {
+        "commit_sha": "97a845e",
+        "test_command": "minuscorrect run --worktree -- pytest tests/staging/",
+        "exit_code": 0,
+        "verified_at": "2026-09-27T20:28:45.271818+00:00",
+        "specialist": "Security & Policy Auditor",
+        "integrity_hash": "",
+        "base_commit_sha": "2e5aee7c8982bace5e66aa4bfdea39d4d8ecc770",
+        "head_commit_sha": "97a845e",
+        "diff_file": "diffs/T-002.patch",
+        "files_touched": [
+          ".minus/index.json",
+          ".minus/research/RES-021.md",
+          "DRAFT-PR-default.md",
+          "src/stripe_webhook.py",
+          "tests/staging/test_stripe_webhook.py"
+        ],
+        "insertions": 484,
+        "deletions": 1
+      }
     },
     "T-003": {
       "id": "T-003",
       "title": "Surgical Implementation & Invariant Enforcement: build a webhook listener for Stripe paym",
       "role": "Distributed Systems Engineer",
-      "status": "open",
+      "status": "completed",
       "blocked_by": [
         "T-002"
       ],
       "blocks": [
         "T-004"
       ],
-      "file": "tickets/open/T-003.md",
+      "file": "tickets/completed/T-003.md",
       "created_at": "2026-09-24T05:45:07.951363+00:00",
-      "closed_at": null
+      "closed_at": "2026-09-27T20:28:52.168083+00:00",
+      "receipt": {
+        "commit_sha": "97a845e",
+        "test_command": "minuscorrect run --worktree --isolate-env -- pytest tests/staging/",
+        "exit_code": 0,
+        "verified_at": "2026-09-27T20:28:52.378813+00:00",
+        "specialist": "Distributed Systems Engineer",
+        "integrity_hash": "",
+        "base_commit_sha": "2e5aee7c8982bace5e66aa4bfdea39d4d8ecc770",
+        "head_commit_sha": "97a845e",
+        "diff_file": "diffs/T-003.patch",
+        "files_touched": [
+          ".minus/index.json",
+          ".minus/research/RES-021.md",
+          "DRAFT-PR-default.md",
+          "src/stripe_webhook.py",
+          "tests/staging/test_stripe_webhook.py"
+        ],
+        "insertions": 484,
+        "deletions": 1
+      }
     },
     "T-004": {
       "id": "T-004",
       "title": "Systemic Integrity Audit, Debug Tag Purge & PR Export",
       "role": "TDD & Verification Lead",
-      "status": "open",
+      "status": "completed",
       "blocked_by": [
         "T-003"
       ],
       "blocks": [],
-      "file": "tickets/open/T-004.md",
+      "file": "tickets/completed/T-004.md",
       "created_at": "2026-09-24T05:45:07.959112+00:00",
-      "closed_at": null
+      "closed_at": "2026-09-27T20:28:56.981622+00:00",
+      "receipt": {
+        "commit_sha": "97a845e",
+        "test_command": "minuscorrect verify --fix --strict",
+        "exit_code": 0,
+        "verified_at": "2026-09-27T20:28:57.189104+00:00",
+        "specialist": "TDD & Verification Lead",
+        "integrity_hash": "",
+        "base_commit_sha": "2e5aee7c8982bace5e66aa4bfdea39d4d8ecc770",
+        "head_commit_sha": "97a845e",
+        "diff_file": "diffs/T-004.patch",
+        "files_touched": [
+          ".minus/index.json",
+          ".minus/research/RES-021.md",
+          "DRAFT-PR-default.md",
+          "src/stripe_webhook.py",
+          "tests/staging/test_stripe_webhook.py"
+        ],
+        "insertions": 484,
+        "deletions": 1
+      }
     },
     "T-005": {
       "id": "T-005",
@@ -491,6 +551,17 @@
       "consensus_score": 1.0,
       "consensus_verdict": "Strong Consensus",
       "contradictions_count": 0
+    },
+    "RES-021": {
+      "id": "RES-021",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-27T20:16:25.130759+00:00",
+      "file": "research/RES-021.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
     }
   },
   "rules": {
@@ -600,6 +671,45 @@
       "insertions": 1645,
       "deletions": 30,
       "patch_sha256": "04b06d5c04ae653d028e42dc637dfd03738045c5e133b26e92de04f6a44d4c20"
+    },
+    "T-002": {
+      "diff_file": "diffs/T-002.patch",
+      "files_touched": [
+        ".minus/index.json",
+        ".minus/research/RES-021.md",
+        "DRAFT-PR-default.md",
+        "src/stripe_webhook.py",
+        "tests/staging/test_stripe_webhook.py"
+      ],
+      "insertions": 484,
+      "deletions": 1,
+      "patch_sha256": "19d6dde6ad1ffabe70a552f3fa887c56d4d4e31c4ddbaa3e134fa295b5599f90"
+    },
+    "T-003": {
+      "diff_file": "diffs/T-003.patch",
+      "files_touched": [
+        ".minus/index.json",
+        ".minus/research/RES-021.md",
+        "DRAFT-PR-default.md",
+        "src/stripe_webhook.py",
+        "tests/staging/test_stripe_webhook.py"
+      ],
+      "insertions": 484,
+      "deletions": 1,
+      "patch_sha256": "19d6dde6ad1ffabe70a552f3fa887c56d4d4e31c4ddbaa3e134fa295b5599f90"
+    },
+    "T-004": {
+      "diff_file": "diffs/T-004.patch",
+      "files_touched": [
+        ".minus/index.json",
+        ".minus/research/RES-021.md",
+        "DRAFT-PR-default.md",
+        "src/stripe_webhook.py",
+        "tests/staging/test_stripe_webhook.py"
+      ],
+      "insertions": 484,
+      "deletions": 1,
+      "patch_sha256": "19d6dde6ad1ffabe70a552f3fa887c56d4d4e31c4ddbaa3e134fa295b5599f90"
     }
   }
 }
