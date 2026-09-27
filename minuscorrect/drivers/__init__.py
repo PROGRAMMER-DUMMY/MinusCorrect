@@ -23,6 +23,9 @@ from minuscorrect.drivers.treesitter_driver import (
     PolyglotDependencyMissing,
     TreeSitterDriver,
 )
+from minuscorrect.drivers.typescript_driver import (
+    TypeScriptDriver,
+)
 
 # Register default Python driver
 register_driver(NativePythonDriver())
@@ -33,6 +36,7 @@ __all__ = [
     "NativePythonDriver",
     "PolyglotDependencyMissing",
     "TreeSitterDriver",
+    "TypeScriptDriver",
     "detect_assert_free_tests",
     "detect_banned_benchmark_fixtures",
     "detect_tautological_assertions",
