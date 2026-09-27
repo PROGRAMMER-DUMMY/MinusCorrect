@@ -2,31 +2,37 @@
 MinusCorrect Anti-Benchmark-Maxxing & Anti-Cheating Guardian.
 Detects LLM overfitting to test fixtures, hardcoded branch bypasses,
 tautological assertions, test tampering, and naked exception swallowing.
+# verifies: tests/unit/test_anti_cheat.py
 """
 
 from __future__ import annotations
 
 import ast
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 import importlib.util
 import json
 from pathlib import Path
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
+from minuscorrect.drivers.base import (
+    AstDriver,
+    CheatViolation,
+    get_driver_for_file,
+    get_registered_drivers,
+    register_driver,
+)
+from minuscorrect.drivers.python_driver import (
+    NativePythonDriver,
+    detect_assert_free_tests,
+    detect_banned_benchmark_fixtures,
+    detect_tautological_assertions,
+    detect_test_exception_swallowing,
+    detect_vacuous_assertions,
+)
 
-@dataclass
-class CheatViolation:
-    """Represents a detected benchmark cheat, test bypass, or overfitting flaw."""
-    violation_type: str  # HARDCODED_TEST_BYPASS, TAUTOLOGICAL_ASSERTION, EXCEPTION_SWALLOWING, TEST_TAMPERING
-    file_path: str
-    line_number: int
-    severity: str  # Blocks launch, Warning
-    description: str
-    snippet: str
-
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+# Register default Python AST driver
+register_driver(NativePythonDriver())
 
 
 @dataclass
@@ -138,162 +144,6 @@ def detect_hardcoded_overfitting(
     return violations
 
 
-def detect_tautological_assertions(test_code: str, test_path: str = "test.py") -> List[CheatViolation]:
-    """
-    Detects tautological assertions in test suites (e.g. assert True, assert x == x).
-    # verifies: tests/unit/test_anti_cheat.py
-    """
-    violations: List[CheatViolation] = []
-    try:
-        tree = ast.parse(test_code)
-    except SyntaxError:
-        return violations
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assert):
-            # Case 1: assert True / assert 1
-            if isinstance(node.test, ast.Constant) and bool(node.test.value) is True:
-                violations.append(CheatViolation(
-                    violation_type="TAUTOLOGICAL_ASSERTION",
-                    file_path=test_path,
-                    line_number=node.lineno,
-                    severity="Blocks launch",
-                    description="Tautological assertion 'assert True' detected; does not verify program behavior.",
-                    snippet="assert True",
-                ))
-            # Case 2: assert x == x
-            elif isinstance(node.test, ast.Compare):
-                left_src = ast.unparse(node.test.left) if hasattr(ast, "unparse") else ""
-                for op, right in zip(node.test.ops, node.test.comparators):
-                    if isinstance(op, ast.Eq):
-                        right_src = ast.unparse(right) if hasattr(ast, "unparse") else ""
-                        if left_src and left_src == right_src:
-                            violations.append(CheatViolation(
-                                violation_type="TAUTOLOGICAL_ASSERTION",
-                                file_path=test_path,
-                                line_number=node.lineno,
-                                severity="Blocks launch",
-                                description=f"Self-comparison assertion detected: 'assert {left_src} == {right_src}'.",
-                                snippet=f"assert {left_src} == {right_src}",
-                            ))
-    return violations
-
-
-def detect_assert_free_tests(test_code: str, test_path: str = "test.py") -> List[CheatViolation]:
-    """
-    Detects test functions that contain zero assertions or pytest checks.
-    # verifies: tests/unit/test_anti_cheat.py
-    """
-    violations: List[CheatViolation] = []
-    try:
-        tree = ast.parse(test_code)
-    except SyntaxError:
-        return violations
-
-    for func in ast.walk(tree):
-        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)) and func.name.startswith("test_"):
-            has_assert = False
-            for node in ast.walk(func):
-                if isinstance(node, ast.Assert):
-                    has_assert = True
-                    break
-                elif isinstance(node, ast.Call):
-                    call_name = ""
-                    if isinstance(node.func, ast.Name):
-                        call_name = node.func.id
-                    elif isinstance(node.func, ast.Attribute):
-                        call_name = node.func.attr
-                    if any(kw in call_name.lower() for kw in ("raises", "assert", "fail", "warns", "deprecated")):
-                        has_assert = True
-                        break
-            if not has_assert:
-                violations.append(CheatViolation(
-                    violation_type="ASSERT_FREE_TEST",
-                    file_path=test_path,
-                    line_number=func.lineno,
-                    severity="Blocks launch",
-                    description=f"Test function '{func.name}' contains zero assert or verification statements; does not verify behavior.",
-                    snippet=f"def {func.name}(...):",
-                ))
-    return violations
-
-
-def detect_test_exception_swallowing(test_code: str, test_path: str = "test.py") -> List[CheatViolation]:
-    """
-    Detects test functions that catch exceptions and silently pass or return.
-    # verifies: tests/unit/test_anti_cheat.py
-    """
-    violations: List[CheatViolation] = []
-    try:
-        tree = ast.parse(test_code)
-    except SyntaxError:
-        return violations
-
-    for func in ast.walk(tree):
-        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)) and func.name.startswith("test_"):
-            for node in ast.walk(func):
-                if isinstance(node, ast.Try):
-                    for handler in node.handlers:
-                        is_swallowed = False
-                        for stmt in handler.body:
-                            if isinstance(stmt, ast.Pass):
-                                is_swallowed = True
-                            elif isinstance(stmt, ast.Return) and stmt.value is None:
-                                is_swallowed = True
-                            elif isinstance(stmt, ast.Raise):
-                                is_swallowed = False
-                                break
-                        if is_swallowed:
-                            violations.append(CheatViolation(
-                                violation_type="TEST_EXCEPTION_SWALLOWING",
-                                file_path=test_path,
-                                line_number=handler.lineno,
-                                severity="Blocks launch",
-                                description=f"Test function '{func.name}' swallows exception with pass/return in except block, masking potential test failure.",
-                                snippet=ast.unparse(handler) if hasattr(ast, "unparse") else "except: pass",
-                            ))
-    return violations
-
-
-def detect_vacuous_assertions(test_code: str, test_path: str = "test.py") -> List[CheatViolation]:
-    """
-    Detects vacuous, mathematically unfalsifiable assertions (e.g. assert len(...) >= 0).
-    # verifies: tests/unit/test_anti_cheat.py
-    """
-    violations: List[CheatViolation] = []
-    try:
-        tree = ast.parse(test_code)
-    except SyntaxError:
-        return violations
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assert):
-            if isinstance(node.test, ast.Compare):
-                left = node.test.left
-                if isinstance(left, ast.Call) and isinstance(left.func, ast.Name) and left.func.id == "len":
-                    for op, comp in zip(node.test.ops, node.test.comparators):
-                        if isinstance(op, ast.GtE) and isinstance(comp, ast.Constant) and comp.value == 0:
-                            violations.append(CheatViolation(
-                                violation_type="VACUOUS_ASSERTION",
-                                file_path=test_path,
-                                line_number=node.lineno,
-                                severity="Blocks launch",
-                                description="Vacuous assertion 'assert len(...) >= 0' detected; mathematically always true in Python.",
-                                snippet=ast.unparse(node) if hasattr(ast, "unparse") else "assert len(...) >= 0",
-                            ))
-            elif isinstance(node.test, ast.Call) and isinstance(node.test.func, ast.Name) and node.test.func.id == "isinstance":
-                if len(node.test.args) >= 2 and isinstance(node.test.args[1], ast.Name) and node.test.args[1].id == "object":
-                    violations.append(CheatViolation(
-                        violation_type="VACUOUS_ASSERTION",
-                        file_path=test_path,
-                        line_number=node.lineno,
-                        severity="Blocks launch",
-                        description="Vacuous assertion 'assert isinstance(..., object)' detected; all types inherit from object.",
-                        snippet=ast.unparse(node) if hasattr(ast, "unparse") else "assert isinstance(..., object)",
-                    ))
-    return violations
-
-
 def load_custom_checkers(checkers_dir: Optional[Path] = None) -> List[Any]:
     """
     Dynamically loads user-defined custom AST checkers from .minus/checkers/*.py.
@@ -332,24 +182,42 @@ def audit_against_benchmark_cheats(
 ) -> AntiCheatReport:
     """
     Performs full repository anti-cheating audit across source and test files.
+    Dispatches files to their registered AstDriver based on file extension.
     # verifies: tests/unit/test_anti_cheat.py
     """
     report = AntiCheatReport()
-    source_files = list(source_dir.glob("**/*.py")) if source_dir.is_dir() else []
-    test_files = list(test_dir.glob("**/*.py")) if test_dir.is_dir() else []
+    registered = get_registered_drivers()
+    supported_exts = {
+        ext if ext.startswith(".") else f".{ext}"
+        for d in registered.values()
+        for ext in d.supported_extensions
+    }
+    if not supported_exts:
+        supported_exts = {".py"}
+
+    source_files: List[Path] = []
+    test_files: List[Path] = []
+    if source_dir.is_dir():
+        for ext in supported_exts:
+            source_files.extend(source_dir.glob(f"**/*{ext}"))
+    if test_dir.is_dir():
+        for ext in supported_exts:
+            test_files.extend(test_dir.glob(f"**/*{ext}"))
+
+    source_files = sorted(set(source_files))
+    test_files = sorted(set(test_files))
 
     report.files_inspected = len(source_files) + len(test_files)
 
-    # 1. Tautological assertions, empty tests, exception swallowing, vacuous assertions in test files
+    # 1. Dispatch test files to registered AST drivers
     for tf in test_files:
-        try:
-            content = tf.read_text(encoding="utf-8", errors="ignore")
-            report.violations.extend(detect_tautological_assertions(content, test_path=str(tf.name)))
-            report.violations.extend(detect_assert_free_tests(content, test_path=str(tf.name)))
-            report.violations.extend(detect_test_exception_swallowing(content, test_path=str(tf.name)))
-            report.violations.extend(detect_vacuous_assertions(content, test_path=str(tf.name)))
-        except OSError:
-            pass
+        driver = get_driver_for_file(tf)
+        if driver is not None:
+            try:
+                content = tf.read_text(encoding="utf-8", errors="ignore")
+                report.violations.extend(driver.inspect(content, file_path=str(tf.name), is_test=True))
+            except OSError:
+                pass
 
     # 2. Hardcoded test constant bypasses in source files
     combined_test_code = ""
@@ -390,71 +258,34 @@ def audit_against_benchmark_cheats(
             except OSError:
                 pass
 
-    # 4. Check for banned benchmark fixtures and anti-patterns (.minus/anti_patterns.json)
+    # 4. Dispatch source files to registered drivers for banned benchmark fixtures and anti-patterns
     banned_tokens = load_banned_anti_patterns()
     if banned_tokens:
         for sf in source_files:
-            try:
-                content = sf.read_text(encoding="utf-8", errors="ignore")
-                report.violations.extend(detect_banned_benchmark_fixtures(content, banned_tokens, source_path=str(sf.name)))
-            except OSError:
-                pass
+            driver = get_driver_for_file(sf)
+            if driver is not None:
+                try:
+                    content = sf.read_text(encoding="utf-8", errors="ignore")
+                    report.violations.extend(
+                        driver.inspect(
+                            content,
+                            file_path=str(sf.name),
+                            is_test=False,
+                            banned_literals=banned_tokens,
+                        )
+                    )
+                except OSError:
+                    pass
 
     report.passed = not any(v.severity == "Blocks launch" for v in report.violations)
     return report
 
 
-def detect_banned_benchmark_fixtures(
-    source_code: str,
-    banned_literals: Set[str],
-    source_path: str = "source.py",
-) -> List[CheatViolation]:
+def load_banned_anti_patterns(config_path: Optional[Path] = None) -> Set[str]:
     """
-    Detects when executable source code embeds banned benchmark fixture keys or
-    hardcoded table lookups designed to pass benchmarks without general extraction logic.
+    Load banned anti-patterns and benchmark fixture keys from .minus/anti_patterns.json.
     # verifies: tests/unit/test_anti_cheat.py
     """
-    violations: List[CheatViolation] = []
-    if not banned_literals:
-        return violations
-
-    try:
-        tree = ast.parse(source_code)
-    except SyntaxError:
-        return violations
-
-    # Identify and exclude docstring constants
-    docstring_nodes = set()
-    for parent in ast.walk(tree):
-        if isinstance(parent, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            if parent.body and isinstance(parent.body[0], ast.Expr):
-                val = parent.body[0].value
-                if isinstance(val, ast.Constant) and isinstance(val.value, str):
-                    docstring_nodes.add(val)
-
-    for node in ast.walk(tree):
-        if node in docstring_nodes:
-            continue
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            for banned in banned_literals:
-                if banned.lower() in node.value.lower():
-                    violations.append(CheatViolation(
-                        violation_type="BANNED_BENCHMARK_FIXTURE_LEAK",
-                        file_path=source_path,
-                        line_number=node.lineno,
-                        severity="Blocks launch",
-                        description=(
-                            f"Source code contains banned benchmark fixture key '{banned}'. "
-                            f"Embedding hardcoded benchmark answer tables or test tokens is prohibited."
-                        ),
-                        snippet=ast.unparse(node) if hasattr(ast, "unparse") else node.value,
-                    ))
-                    break
-    return violations
-
-
-def load_banned_anti_patterns(config_path: Optional[Path] = None) -> Set[str]:
-    """Load banned anti-patterns and benchmark fixture keys from .minus/anti_patterns.json."""
     if config_path is None:
         config_path = Path.cwd() / ".minus" / "anti_patterns.json"
 
@@ -570,5 +401,23 @@ def harvest_corpus_anti_patterns(
     return newly_added
 
 
-
-
+__all__ = [
+    "AntiCheatReport",
+    "AstDriver",
+    "CheatViolation",
+    "NativePythonDriver",
+    "add_banned_anti_pattern",
+    "audit_against_benchmark_cheats",
+    "detect_assert_free_tests",
+    "detect_banned_benchmark_fixtures",
+    "detect_hardcoded_overfitting",
+    "detect_tautological_assertions",
+    "detect_test_exception_swallowing",
+    "detect_vacuous_assertions",
+    "get_driver_for_file",
+    "get_registered_drivers",
+    "harvest_corpus_anti_patterns",
+    "load_banned_anti_patterns",
+    "load_custom_checkers",
+    "register_driver",
+]

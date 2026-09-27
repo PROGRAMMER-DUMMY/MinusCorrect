@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "created_at": "2026-09-22T21:23:13.340803+00:00",
-  "updated_at": "2026-09-27T13:01:45.084421+00:00",
+  "updated_at": "2026-09-27T19:46:26.545581+00:00",
   "tickets": {
     "T-001": {
       "id": "T-001",
@@ -127,6 +127,50 @@
       "file": "tickets/open/T-004.md",
       "created_at": "2026-09-24T05:45:07.959112+00:00",
       "closed_at": null
+    },
+    "T-005": {
+      "id": "T-005",
+      "title": "Decouple Anti-Cheat behind AstDriver Protocol",
+      "role": "Language Toolchain Architect",
+      "status": "open",
+      "blocked_by": [],
+      "blocks": [],
+      "file": "tickets/open/T-005.md",
+      "created_at": "2026-09-27T19:41:32.662548+00:00",
+      "closed_at": null
+    },
+    "T-006": {
+      "id": "T-006",
+      "title": "TreeSitterDriver Base and Lazy Dependency Guard",
+      "role": "Process Isolation SRE",
+      "status": "open",
+      "blocked_by": [],
+      "blocks": [],
+      "file": "tickets/open/T-006.md",
+      "created_at": "2026-09-27T19:41:39.874699+00:00",
+      "closed_at": null
+    },
+    "T-007": {
+      "id": "T-007",
+      "title": "TypeScript Anti-Cheat S-Expression Engine",
+      "role": "Static Analysis and Security Lead",
+      "status": "open",
+      "blocked_by": [],
+      "blocks": [],
+      "file": "tickets/open/T-007.md",
+      "created_at": "2026-09-27T19:41:47.762572+00:00",
+      "closed_at": null
+    },
+    "T-008": {
+      "id": "T-008",
+      "title": "Packaging and Mixed-Repo CLI Routing",
+      "role": "Distribution and Packaging SRE",
+      "status": "open",
+      "blocked_by": [],
+      "blocks": [],
+      "file": "tickets/open/T-008.md",
+      "created_at": "2026-09-27T19:41:58.700243+00:00",
+      "closed_at": null
     }
   },
   "incidents": {},
@@ -246,6 +290,17 @@
       "topic": "Distributed Concurrency Locks",
       "created_at": "2026-09-27T13:01:45.084389+00:00",
       "file": "research/RES-011.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-012": {
+      "id": "RES-012",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-27T19:46:26.545546+00:00",
+      "file": "research/RES-012.md",
       "findings_count": 12,
       "sources_count": 10,
       "consensus_score": 1.0,
