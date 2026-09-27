@@ -153,8 +153,12 @@ def build_parser() -> argparse.ArgumentParser:
     route_parser.add_argument("query", help="Natural language request or telemetry text")
     route_parser.add_argument("--json", action="store_true", help="Output routing decision in JSON format")
 
-    # Command: anti-cheat
-    anti_cheat_parser = subparsers.add_parser("anti-cheat", help="Audit repository against benchmark overfitting, hardcoded bypasses, and tautologies")
+    # Command: anti-cheat (alias: anticheat)
+    anti_cheat_parser = subparsers.add_parser(
+        "anti-cheat",
+        aliases=["anticheat"],
+        help="Audit repository against benchmark overfitting, hardcoded bypasses, and tautologies",
+    )
     anti_cheat_parser.add_argument("--source-dir", default="minuscorrect", help="Source code directory (default: minuscorrect)")
     anti_cheat_parser.add_argument("--test-dir", default="tests", help="Tests directory (default: tests)")
     anti_cheat_parser.add_argument("--ban", help="Register a banned benchmark fixture token or anti-pattern literal into .minus/anti_patterns.json")
@@ -538,7 +542,7 @@ def main(argv: List[str] = None) -> int:
         return handle_ticket(args)
     elif args.command == "route":
         return handle_route(args)
-    elif args.command == "anti-cheat":
+    elif args.command in ("anti-cheat", "anticheat"):
         return handle_anti_cheat(args)
     elif args.command == "research":
         return handle_research(args)

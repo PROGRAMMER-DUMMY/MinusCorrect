@@ -50,6 +50,15 @@ def test_cli_parser_commands():
     assert args_inc.command == "incident"
     assert args_inc.no_defang is True
 
+    # Subcommand: anti-cheat and anticheat alias
+    args_ac1 = parser.parse_args(["anti-cheat", "--json"])
+    assert args_ac1.command == "anti-cheat"
+    assert args_ac1.json is True
+
+    args_ac2 = parser.parse_args(["anticheat", "--json"])
+    assert args_ac2.command == "anticheat"
+    assert args_ac2.json is True
+
 
 def test_cli_run_missing_command(capsys):
     parser = build_parser()
@@ -248,5 +257,15 @@ def test_cli_plugin_status(capsys):
     assert code == 0
     out = capsys.readouterr().out
     assert "MinusCorrect Plugin Status" in out
+
+
+def test_cli_anticheat_alias_dispatch():
+    from unittest.mock import patch
+    from minuscorrect.cli import main
+
+    with patch("minuscorrect.cli.handle_anti_cheat", return_value=0) as mock_handle:
+        code = main(["anticheat", "--json"])
+        assert code == 0
+        assert mock_handle.called
 
 

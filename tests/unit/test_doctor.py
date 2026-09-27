@@ -18,6 +18,7 @@ from minuscorrect.doctor import (
     check_git_index_lock,
     check_git_repository,
     check_golden_tests,
+    check_polyglot_drivers,
     check_pytest_installed,
     check_python_runtime,
     check_session_storage,
@@ -234,3 +235,29 @@ def test_cli_doctor_failure_exit_code():
         args = parser.parse_args(["doctor"])
         exit_code = handle_doctor(args)
         assert exit_code == 1
+
+
+def test_check_polyglot_drivers_available():
+    """
+    Test check_polyglot_drivers reports available status when drivers can be loaded.
+    # verifies: tests/unit/test_doctor.py
+    """
+    with patch("minuscorrect.drivers.typescript_driver.TypeScriptDriver.is_available", return_value=True):
+        check = check_polyglot_drivers()
+        assert check.category == "Runtime"
+        assert check.name == "Polyglot AST Drivers"
+        assert check.status == "OK"
+        assert "tree-sitter" in check.message
+
+
+def test_check_polyglot_drivers_missing():
+    """
+    Test check_polyglot_drivers reports optional guidance when drivers are missing.
+    # verifies: tests/unit/test_doctor.py
+    """
+    with patch("minuscorrect.drivers.typescript_driver.TypeScriptDriver.is_available", return_value=False):
+        check = check_polyglot_drivers()
+        assert check.category == "Runtime"
+        assert check.name == "Polyglot AST Drivers"
+        assert check.status == "OPTIONAL"
+        assert "minuscorrect[polyglot]" in check.message

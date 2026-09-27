@@ -35,6 +35,26 @@ from minuscorrect.drivers.python_driver import (
 register_driver(NativePythonDriver())
 
 
+def register_polyglot_drivers() -> None:
+    """
+    Lazily registers polyglot AST drivers (e.g. TypeScriptDriver) if available in the environment.
+    # verifies: tests/unit/test_anti_cheat.py
+    """
+    registered = get_registered_drivers()
+    if "typescript" not in registered:
+        try:
+            from minuscorrect.drivers.typescript_driver import TypeScriptDriver
+            driver = TypeScriptDriver()
+            if driver.is_available():
+                register_driver(driver)
+        except Exception:
+            pass
+
+
+# Lazily register available polyglot drivers
+register_polyglot_drivers()
+
+
 @dataclass
 class AntiCheatReport:
     """Report summarizing anti-cheating and benchmark robustness inspection."""
@@ -186,6 +206,7 @@ def audit_against_benchmark_cheats(
     # verifies: tests/unit/test_anti_cheat.py
     """
     report = AntiCheatReport()
+    register_polyglot_drivers()
     registered = get_registered_drivers()
     supported_exts = {
         ext if ext.startswith(".") else f".{ext}"
@@ -219,21 +240,23 @@ def audit_against_benchmark_cheats(
             except OSError:
                 pass
 
-    # 2. Hardcoded test constant bypasses in source files
+    # 2. Hardcoded test constant bypasses in source files (Python AST)
     combined_test_code = ""
     for tf in test_files:
-        try:
-            combined_test_code += tf.read_text(encoding="utf-8", errors="ignore") + "\n"
-        except OSError:
-            pass
+        if tf.suffix.lower() == ".py":
+            try:
+                combined_test_code += tf.read_text(encoding="utf-8", errors="ignore") + "\n"
+            except OSError:
+                pass
 
     for sf in source_files:
-        try:
-            content = sf.read_text(encoding="utf-8", errors="ignore")
-            bypasses = detect_hardcoded_overfitting(content, combined_test_code, source_path=str(sf.name))
-            report.violations.extend(bypasses)
-        except OSError:
-            pass
+        if sf.suffix.lower() == ".py":
+            try:
+                content = sf.read_text(encoding="utf-8", errors="ignore")
+                bypasses = detect_hardcoded_overfitting(content, combined_test_code, source_path=str(sf.name))
+                report.violations.extend(bypasses)
+            except OSError:
+                pass
 
     # 3. Dynamic user-defined custom checkers from .minus/checkers/*.py
     custom_checkers = load_custom_checkers(checkers_dir)
@@ -420,4 +443,5 @@ __all__ = [
     "load_banned_anti_patterns",
     "load_custom_checkers",
     "register_driver",
+    "register_polyglot_drivers",
 ]

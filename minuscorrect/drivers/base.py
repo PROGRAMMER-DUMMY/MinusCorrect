@@ -68,7 +68,7 @@ def get_driver_for_file(path: Union[str, Path]) -> Optional[AstDriver]:
     if not suffix and p.name.startswith("."):
         suffix = p.name.lower()
 
-    for driver in _DRIVERS.values():
+    for driver in reversed(list(_DRIVERS.values())):
         if (
             suffix in driver.supported_extensions
             or suffix.lstrip(".") in driver.supported_extensions

@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "created_at": "2026-09-22T21:23:13.340803+00:00",
-  "updated_at": "2026-09-27T20:05:03.434018+00:00",
+  "updated_at": "2026-09-27T20:15:35.637327+00:00",
   "tickets": {
     "T-001": {
       "id": "T-001",
@@ -203,23 +203,71 @@
       "id": "T-007",
       "title": "TypeScript Anti-Cheat S-Expression Engine",
       "role": "Static Analysis and Security Lead",
-      "status": "open",
+      "status": "completed",
       "blocked_by": [],
       "blocks": [],
-      "file": "tickets/open/T-007.md",
+      "file": "tickets/completed/T-007.md",
       "created_at": "2026-09-27T19:41:47.762572+00:00",
-      "closed_at": null
+      "closed_at": "2026-09-27T20:06:11.436805+00:00",
+      "receipt": {
+        "commit_sha": "2c2699d",
+        "test_command": "pytest tests/unit/test_typescript_anticheat.py",
+        "exit_code": 0,
+        "verified_at": "2026-09-27T20:06:11.942342+00:00",
+        "specialist": "Static Analysis and Security Lead",
+        "integrity_hash": "",
+        "base_commit_sha": "51b967e218374a21bd6cf216a75bdae20d0e3a9e",
+        "head_commit_sha": "2c2699d",
+        "diff_file": "diffs/T-007.patch",
+        "files_touched": [
+          ".minus/index.json",
+          ".minus/research/RES-015.md",
+          ".minus/research/RES-016.md",
+          ".minus/research/RES-017.md",
+          ".minus/tickets/completed/T-006.md",
+          ".minus/tickets/open/T-006.md",
+          "minuscorrect/drivers/__init__.py",
+          "minuscorrect/drivers/typescript_driver.py",
+          "tests/unit/test_typescript_anticheat.py"
+        ],
+        "insertions": 1645,
+        "deletions": 30
+      }
     },
     "T-008": {
       "id": "T-008",
       "title": "Packaging and Mixed-Repo CLI Routing",
       "role": "Distribution and Packaging SRE",
-      "status": "open",
+      "status": "completed",
       "blocked_by": [],
       "blocks": [],
-      "file": "tickets/open/T-008.md",
+      "file": "tickets/completed/T-008.md",
       "created_at": "2026-09-27T19:41:58.700243+00:00",
-      "closed_at": null
+      "closed_at": "2026-09-27T20:15:35.418063+00:00",
+      "receipt": {
+        "commit_sha": "2c2699d79c35e64a072c72567b6ef4c70c6e4d33",
+        "test_command": "minuscorrect verify --strict",
+        "exit_code": 0,
+        "verified_at": "2026-09-27T20:15:35.634743+00:00",
+        "specialist": "Distribution and Packaging SRE",
+        "integrity_hash": "",
+        "base_commit_sha": "51b967e218374a21bd6cf216a75bdae20d0e3a9e",
+        "head_commit_sha": "2c2699d79c35e64a072c72567b6ef4c70c6e4d33",
+        "diff_file": "diffs/T-008.patch",
+        "files_touched": [
+          ".minus/index.json",
+          ".minus/research/RES-015.md",
+          ".minus/research/RES-016.md",
+          ".minus/research/RES-017.md",
+          ".minus/tickets/completed/T-006.md",
+          ".minus/tickets/open/T-006.md",
+          "minuscorrect/drivers/__init__.py",
+          "minuscorrect/drivers/typescript_driver.py",
+          "tests/unit/test_typescript_anticheat.py"
+        ],
+        "insertions": 1645,
+        "deletions": 30
+      }
     }
   },
   "incidents": {},
@@ -410,6 +458,39 @@
       "consensus_score": 1.0,
       "consensus_verdict": "Strong Consensus",
       "contradictions_count": 0
+    },
+    "RES-018": {
+      "id": "RES-018",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-27T20:07:51.664250+00:00",
+      "file": "research/RES-018.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-019": {
+      "id": "RES-019",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-27T20:13:13.421869+00:00",
+      "file": "research/RES-019.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-020": {
+      "id": "RES-020",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-27T20:14:13.869625+00:00",
+      "file": "research/RES-020.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
     }
   },
   "rules": {
@@ -485,6 +566,40 @@
       "insertions": 968,
       "deletions": 31,
       "patch_sha256": "7ca91e995f757e7ba06d392ca74d0635519b7e76d90fc0440e817837d4174fab"
+    },
+    "T-007": {
+      "diff_file": "diffs/T-007.patch",
+      "files_touched": [
+        ".minus/index.json",
+        ".minus/research/RES-015.md",
+        ".minus/research/RES-016.md",
+        ".minus/research/RES-017.md",
+        ".minus/tickets/completed/T-006.md",
+        ".minus/tickets/open/T-006.md",
+        "minuscorrect/drivers/__init__.py",
+        "minuscorrect/drivers/typescript_driver.py",
+        "tests/unit/test_typescript_anticheat.py"
+      ],
+      "insertions": 1645,
+      "deletions": 30,
+      "patch_sha256": "04b06d5c04ae653d028e42dc637dfd03738045c5e133b26e92de04f6a44d4c20"
+    },
+    "T-008": {
+      "diff_file": "diffs/T-008.patch",
+      "files_touched": [
+        ".minus/index.json",
+        ".minus/research/RES-015.md",
+        ".minus/research/RES-016.md",
+        ".minus/research/RES-017.md",
+        ".minus/tickets/completed/T-006.md",
+        ".minus/tickets/open/T-006.md",
+        "minuscorrect/drivers/__init__.py",
+        "minuscorrect/drivers/typescript_driver.py",
+        "tests/unit/test_typescript_anticheat.py"
+      ],
+      "insertions": 1645,
+      "deletions": 30,
+      "patch_sha256": "04b06d5c04ae653d028e42dc637dfd03738045c5e133b26e92de04f6a44d4c20"
     }
   }
 }

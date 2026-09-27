@@ -40,6 +40,12 @@ Homepage = "https://github.com/PROGRAMMER-DUMMY/MinusCorrect"
 Repository = "https://github.com/PROGRAMMER-DUMMY/MinusCorrect"
 Issues = "https://github.com/PROGRAMMER-DUMMY/MinusCorrect/issues"
 
+[project.optional-dependencies]
+polyglot = [
+    "tree-sitter>=0.22.0",
+    "tree-sitter-typescript>=0.23.0",
+]
+
 [project.scripts]
 minuscorrect = "minuscorrect.cli:main"
 mc-supervisor = "minuscorrect.cli:supervisor_main"

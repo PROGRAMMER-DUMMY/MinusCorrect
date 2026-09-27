@@ -67,18 +67,24 @@ def test_custom_driver_registration() -> None:
             return []
 
     js_driver = DummyJsDriver()
-    register_driver(js_driver)
+    import minuscorrect.drivers.base as base_mod
+    orig_drivers = dict(base_mod._DRIVERS)
+    try:
+        register_driver(js_driver)
 
-    registered = get_registered_drivers()
-    assert "javascript" in registered
+        registered = get_registered_drivers()
+        assert "javascript" in registered
 
-    found = get_driver_for_file("frontend/src/index.jsx")
-    assert found is not None
-    assert found.name == "javascript"
+        found = get_driver_for_file("frontend/src/index.jsx")
+        assert found is not None
+        assert found.name == "javascript"
 
-    violations = found.inspect("const x = CHEAT_PAYLOAD;", "index.jsx")
-    assert len(violations) == 1
-    assert violations[0].violation_type == "JS_CHEAT"
+        violations = found.inspect("const x = CHEAT_PAYLOAD;", "index.jsx")
+        assert len(violations) == 1
+        assert violations[0].violation_type == "JS_CHEAT"
+    finally:
+        base_mod._DRIVERS.clear()
+        base_mod._DRIVERS.update(orig_drivers)
 
 
 def test_native_python_driver_inspect_test_suite() -> None:

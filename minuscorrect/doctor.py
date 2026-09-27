@@ -74,6 +74,35 @@ def check_pytest_installed() -> DiagnosticCheck:
         )
 
 
+def check_polyglot_drivers() -> DiagnosticCheck:
+    """
+    Validates availability of optional polyglot AST parsing dependencies (Tree-sitter).
+    # Rationale: Optional tree-sitter and grammar packages enable anti-cheat audits for TypeScript and JavaScript.
+    """
+    ts_available = False
+    try:
+        from minuscorrect.drivers.typescript_driver import TypeScriptDriver
+        driver = TypeScriptDriver()
+        ts_available = driver.is_available()
+    except Exception:
+        ts_available = False
+
+    if ts_available:
+        return DiagnosticCheck(
+            category="Runtime",
+            name="Polyglot AST Drivers",
+            status="OK",
+            message="tree-sitter, tree-sitter-typescript available",
+        )
+    return DiagnosticCheck(
+        category="Runtime",
+        name="Polyglot AST Drivers",
+        status="OPTIONAL",
+        message="not installed (install via pip install minuscorrect[polyglot])",
+        details="Install via: pip install minuscorrect[polyglot] for .ts, .tsx, .js, .jsx support",
+    )
+
+
 def check_git_binary() -> DiagnosticCheck:
     """
     Checks that the git command line binary is accessible on PATH.
@@ -401,6 +430,7 @@ def run_diagnostics(cwd: Optional[Path] = None) -> List[DiagnosticCheck]:
     checks: List[DiagnosticCheck] = [
         check_python_runtime(),
         check_pytest_installed(),
+        check_polyglot_drivers(),
         check_git_binary(),
         check_git_repository(cwd),
         check_git_index_lock(cwd),
@@ -421,7 +451,7 @@ def format_diagnostic_text(checks: List[DiagnosticCheck]) -> str:
     ]
 
     current_cat = None
-    pass_count = sum(1 for c in checks if c.status == "PASS")
+    pass_count = sum(1 for c in checks if c.status in ("PASS", "OK"))
     warn_count = sum(1 for c in checks if c.status == "WARN")
     fail_count = sum(1 for c in checks if c.status == "FAIL")
 
@@ -431,8 +461,8 @@ def format_diagnostic_text(checks: List[DiagnosticCheck]) -> str:
             lines.append(f"\n[{current_cat}]")
 
         status_tag = f"[{c.status}]"
-        lines.append(f"  {status_tag:<8} {c.name}: {c.message}")
-        if c.details and c.status != "PASS":
+        lines.append(f"  {status_tag:<10} {c.name}: {c.message}")
+        if c.details and c.status not in ("PASS", "OK"):
             lines.append(f"           -> Details: {c.details}")
 
     lines.append("\n" + "-" * 60)
@@ -451,7 +481,7 @@ def format_diagnostic_text(checks: List[DiagnosticCheck]) -> str:
 
 def format_diagnostic_json(checks: List[DiagnosticCheck]) -> str:
     """Formats diagnostic check results as structured JSON."""
-    pass_count = sum(1 for c in checks if c.status == "PASS")
+    pass_count = sum(1 for c in checks if c.status in ("PASS", "OK"))
     warn_count = sum(1 for c in checks if c.status == "WARN")
     fail_count = sum(1 for c in checks if c.status == "FAIL")
 

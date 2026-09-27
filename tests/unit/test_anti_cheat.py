@@ -306,5 +306,67 @@ SEC100P_BENCHMARK = [
     assert "sec_10k_p7_balance_sheet" in loaded
 
 
+def test_register_polyglot_drivers_registers_typescript() -> None:
+    from minuscorrect.anti_cheat import register_polyglot_drivers
+    from minuscorrect.drivers.base import get_registered_drivers
+    register_polyglot_drivers()
+    registered = get_registered_drivers()
+    assert "python" in registered
+    assert "typescript" in registered
+
+
+def test_mixed_repo_polyglot_audit_clean(tmp_path: Path) -> None:
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    (src_dir / "app.py").write_text("def run(): return 42\n", encoding="utf-8")
+    (src_dir / "service.ts").write_text("export function compute(x: number): number { return x * 2; }\n", encoding="utf-8")
+    (src_dir / "component.tsx").write_text("export const Button = () => <button>Click</button>;\n", encoding="utf-8")
+    (src_dir / "script.js").write_text("function hello() { return 'world'; }\n", encoding="utf-8")
+    (src_dir / "view.jsx").write_text("export const View = () => <div>View</div>;\n", encoding="utf-8")
+
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    (test_dir / "test_app.py").write_text("from src.app import run\ndef test_run(): assert run() == 42\n", encoding="utf-8")
+    (test_dir / "test_service.ts").write_text("describe('svc', () => { it('works', () => { expect(compute(2)).toBe(4); }); });\n", encoding="utf-8")
+    (test_dir / "test_component.tsx").write_text("describe('btn', () => { it('renders', () => { expect(Button()).not.toBeNull(); }); });\n", encoding="utf-8")
+    (test_dir / "test_script.js").write_text("describe('js', () => { it('greets', () => { expect(hello()).toBe('world'); }); });\n", encoding="utf-8")
+    (test_dir / "test_view.jsx").write_text("describe('jsx', () => { it('shows', () => { expect(View()).toBeDefined(); }); });\n", encoding="utf-8")
+
+    report = audit_against_benchmark_cheats(src_dir, test_dir)
+    assert report.files_inspected == 10
+    # Clean assertions
+    assert report.passed is True
+    assert len(report.violations) == 0
+
+
+def test_mixed_repo_polyglot_audit_detects_violations(tmp_path: Path) -> None:
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    (src_dir / "app.py").write_text("def run(): return 42\n", encoding="utf-8")
+    (src_dir / "component.tsx").write_text("export const Card = () => <div>Card</div>;\n", encoding="utf-8")
+
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    (test_dir / "test_app.py").write_text("def test_run(): assert 1 == 1\n", encoding="utf-8")
+    # Tautological assertion in TSX
+    (test_dir / "test_component.tsx").write_text(
+        "describe('card', () => { it('tautology', () => { const res = 10; expect(res).toBe(res); }); });\n",
+        encoding="utf-8",
+    )
+    # Empty catch swallowing in JS
+    (test_dir / "test_swallow.js").write_text(
+        "describe('swallow', () => { it('catches', () => { try { doThrow(); } catch (err) {} }); });\n",
+        encoding="utf-8",
+    )
+
+    report = audit_against_benchmark_cheats(src_dir, test_dir)
+    assert report.files_inspected == 5
+    assert report.passed is False
+    v_types = {v.violation_type for v in report.violations}
+    assert "TAUTOLOGICAL_ASSERTION" in v_types
+    assert "TEST_EXCEPTION_SWALLOWING" in v_types
+
+
+
 
 
