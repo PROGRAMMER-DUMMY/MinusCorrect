@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "created_at": "2026-09-22T21:23:13.340803+00:00",
-  "updated_at": "2026-09-27T19:46:26.545581+00:00",
+  "updated_at": "2026-09-27T19:53:37.076264+00:00",
   "tickets": {
     "T-001": {
       "id": "T-001",
@@ -132,12 +132,38 @@
       "id": "T-005",
       "title": "Decouple Anti-Cheat behind AstDriver Protocol",
       "role": "Language Toolchain Architect",
-      "status": "open",
+      "status": "completed",
       "blocked_by": [],
       "blocks": [],
-      "file": "tickets/open/T-005.md",
+      "file": "tickets/completed/T-005.md",
       "created_at": "2026-09-27T19:41:32.662548+00:00",
-      "closed_at": null
+      "closed_at": "2026-09-27T19:48:24.480041+00:00",
+      "receipt": {
+        "commit_sha": "7a3deb8",
+        "test_command": "pytest tests/unit/test_anti_cheat.py tests/unit/test_drivers.py",
+        "exit_code": 0,
+        "verified_at": "2026-09-27T19:48:24.768780+00:00",
+        "specialist": "Language Toolchain Architect",
+        "integrity_hash": "",
+        "base_commit_sha": "c5718546ee1379a83f7dd91dc08ce8be7b484554",
+        "head_commit_sha": "7a3deb8",
+        "diff_file": "diffs/T-005.patch",
+        "files_touched": [
+          ".minus/index.json",
+          ".minus/research/RES-012.md",
+          ".minus/tickets/open/T-005.md",
+          ".minus/tickets/open/T-006.md",
+          ".minus/tickets/open/T-007.md",
+          ".minus/tickets/open/T-008.md",
+          "minuscorrect/anti_cheat.py",
+          "minuscorrect/drivers/__init__.py",
+          "minuscorrect/drivers/base.py",
+          "minuscorrect/drivers/python_driver.py",
+          "tests/unit/test_drivers.py"
+        ],
+        "insertions": 1011,
+        "deletions": 240
+      }
     },
     "T-006": {
       "id": "T-006",
@@ -306,6 +332,28 @@
       "consensus_score": 1.0,
       "consensus_verdict": "Strong Consensus",
       "contradictions_count": 0
+    },
+    "RES-013": {
+      "id": "RES-013",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-27T19:49:02.298506+00:00",
+      "file": "research/RES-013.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-014": {
+      "id": "RES-014",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-27T19:53:37.076221+00:00",
+      "file": "research/RES-014.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
     }
   },
   "rules": {
@@ -344,6 +392,27 @@
       "file": "rules/RULE-004.md",
       "instruction": "All UI elements must utilize Tailwind CSS v4 design tokens and CSS custom properties with WCAG AA compliance.",
       "created_at": "2026-09-24T05:45:07.939402+00:00"
+    }
+  },
+  "diffs": {
+    "T-005": {
+      "diff_file": "diffs/T-005.patch",
+      "files_touched": [
+        ".minus/index.json",
+        ".minus/research/RES-012.md",
+        ".minus/tickets/open/T-005.md",
+        ".minus/tickets/open/T-006.md",
+        ".minus/tickets/open/T-007.md",
+        ".minus/tickets/open/T-008.md",
+        "minuscorrect/anti_cheat.py",
+        "minuscorrect/drivers/__init__.py",
+        "minuscorrect/drivers/base.py",
+        "minuscorrect/drivers/python_driver.py",
+        "tests/unit/test_drivers.py"
+      ],
+      "insertions": 1011,
+      "deletions": 240,
+      "patch_sha256": "d90ace17612d024a487db7992532cebd0be4eb6b3d23f7139fba52caf36ee675"
     }
   }
 }
