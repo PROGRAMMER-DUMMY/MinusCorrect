@@ -58,9 +58,22 @@ def check_hardcoded_benchmark_matrices(content: str, path: str):
     ...
 ```
 
-### 5. Pre-Commit Integration
+### 5. Polyglot AST Anti-Cheat (TypeScript, TSX, JavaScript)
+MinusCorrect includes pluggable Tree-sitter drivers for inspecting polyglot and mixed repositories (`.py`, `.ts`, `.tsx`, `.js`, `.jsx`):
+- **Tautological Assertions**: Flags `expect(x).toBe(x)`, `expect(x).toEqual(x)`, `expect(true).toBe(true)`, `assert.equal(x, x)`, `assert.strictEqual(x, x)`.
+- **Empty Catches**: Flags `catch (e) {}` blocks that swallow runtime exceptions without handling.
+- **Assert-Free Tests**: Flags `it('...', ...)` or `test('...', ...)` with zero assertions or expect calls.
+- **Fixture Leaks**: Scans TSX/JSX literals and string templates for banned benchmark answer tokens.
+
+To install polyglot dependencies:
+```bash
+pip install minuscorrect[polyglot]
+```
+
+### 6. Pre-Commit Integration
 Anti-cheat checks run automatically under strict verification:
 ```bash
 minuscorrect verify --strict
 ```
 Fails the build if any `Blocks launch` anti-cheat violations are found.
+
