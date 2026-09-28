@@ -1,9 +1,8 @@
 ---
-name: minuscorrect-intake
+name: intake
 description: >-
-  Cognitive intent ingestion and automated task orchestration. Translates raw user instructions, feature ideas, and architectural questions into formal invariants, auto-registered project rules in .minus/rules/, 5-advisor LLM Council syntheses, and executable Ask-Matt tracer-bullet tickets. Triggers include /intake, /plan, intake, cognitive intake, ingest intent.
+  Cognitive intent ingestion: extract invariants, auto-register rules, convene council, and write Ask-Matt tickets.
 ---
-
 # MinusCorrect Cognitive Intent Ingestion Skill
 
 MinusCorrect provides cognitive intent ingestion to transform unstructured, natural language user prompts into formal invariants, persistent project rules, architectural trade-off evaluations, and decomposed tracer-bullet tickets.

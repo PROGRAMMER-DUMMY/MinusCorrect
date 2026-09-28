@@ -1,9 +1,8 @@
 ---
-name: minuscorrect-research
+name: research
 description: >-
-  Recursive multi-wave deep web research swarm, active cross-comparison, and knowledge ontology protocol for autonomous coding agents. Decomposes any technical topic into Wave 0 (1 scout agent), Wave 1 (3 orthogonal expansion agents), and Wave 2 (8 parallel deep-swarm specialists). Actively compares approaches across a comparative trade-off matrix, detects contradictions and safety traps across sources, computes consensus convergence, and persists full reports into the .minus/research/ second-brain store. Triggers include /research, /deep-research, deep-research, deep research, research swarm, web research ontology, research topic.
+  Recursive multi-wave deep web research swarm with consensus synthesis in .minus/research/.
 ---
-
 # MinusCorrect Deep Web Research Swarm & Knowledge Ontology Skill
 
 An enterprise-grade, agentic research protocol for conducting rigorous, multi-wave technical investigations. Rather than dispatching unstructured or repetitive search queries, this skill organizes research into a **recursive 3-wave multi-agent swarm (1 -> 3 -> 8)** that maps unknowns, stress-tests edge cases, actively cross-compares contrasting technical solutions, flags security contradictions, and synthesizes an evidence-backed **Knowledge Ontology** persisted into the repository's `.minus/research/` second-brain.

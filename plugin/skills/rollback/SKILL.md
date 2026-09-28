@@ -1,9 +1,8 @@
 ---
-name: minuscorrect-store
+name: rollback
 description: >-
-  Second-Brain ticket lifecycle store, project rule registry, and atomic rollback engine. Manages append-only tickets in .minus/tickets/{open,completed,rolled_back}/, unified diff patch snapshots, receipt tracking, and safe git rollback with automated post-revert verification. Triggers include /ticket, /rule, /rollback, second brain tickets, rollback ticket, project rules.
+  Atomic Rollback Engine: safely revert an agent ticket commit with automated post-revert verification gates.
 ---
-
 # MinusCorrect Second-Brain Store & Rollback Engine Skill
 
 MinusCorrect embeds a file-system backed Second Brain (`.minus/`) directly into the repository to manage ticket lifecycles, project rules, execution receipts, and atomic rollbacks.

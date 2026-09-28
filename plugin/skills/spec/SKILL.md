@@ -1,9 +1,8 @@
 ---
-name: minuscorrect-spec
+name: spec
 description: >-
-  Enterprise specification suite scaffolding and management. Automatically generates PRD, TRD, Refero-grade DESIGN.md (Tailwind CSS v4 @theme, design tokens, CSS variables), APPFLOW.md state transitions, PostgreSQL/Supabase SCHEMA.sql with Row-Level Security (RLS) enabled by default, and Ask-Matt PLAN.md. Triggers include /spec, scaffold spec, generate prd, generate schema, refero design.
+  Enterprise specification suite scaffolding: PRD, TRD, Refero DESIGN.md, APPFLOW.md, SCHEMA.sql with RLS, and Ask-Matt PLAN.md.
 ---
-
 # MinusCorrect Specification Suite Skill
 
 MinusCorrect provides automated scaffolding of enterprise-grade specifications that bridge product intent, technical invariants, Refero-grade UI design tokens, database schemas with strict security, and executable agent execution plans.

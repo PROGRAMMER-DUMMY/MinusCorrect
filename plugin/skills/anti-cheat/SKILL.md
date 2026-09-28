@@ -1,9 +1,8 @@
 ---
-name: minuscorrect-anticheat
+name: anti-cheat
 description: >-
-  AST-level anti-cheating guardian and benchmark overfitting prevention. Detects assert-free tests, exception swallowing, vacuous assertions, hardcoded test branches, and banned benchmark fixtures (e.g. SEC-10K cash flow mock tables). Supports automated corpus harvesting (--harvest) and custom drop-in checkers in .minus/checkers/. Triggers include /anti-cheat, anti-cheat, benchmark cheat, overfitting detection, harvest benchmark.
+  AST-level anti-cheating guardian and benchmark overfitting prevention for Python and TypeScript.
 ---
-
 # MinusCorrect AST Anti-Cheating Guardian & Benchmark Integrity Skill
 
 MinusCorrect Gate 2 provides AST-level static verification to prevent autonomous coding agents from cheating on evaluation benchmarks, writing vacuous tests, or swallowing exceptions.

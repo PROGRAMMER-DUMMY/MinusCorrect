@@ -1,9 +1,8 @@
 ---
-name: minuscorrect-audit
+name: audit
 description: >-
-  10-Domain Pre-Launch Operational and Security Audit for AI-generated systems. Scans for NEXT_PUBLIC_ secret leaks, missing Supabase RLS, BOLA/IDOR, Next.js Server Action direct execution, unindexed foreign keys, staging robots.txt, and plaintext logging. Triggers include /audit, pre-launch audit, security audit, operational audit.
+  10-Domain Pre-Launch Operational and Security Audit for AI-generated systems (RLS, secrets, webhooks, rate limits).
 ---
-
 # MinusCorrect 10-Domain Pre-Launch Security & Operational Audit Skill
 
 MinusCorrect provides an automated, adversarial pre-launch audit specifically engineered to catch the 10 most common catastrophic vulnerabilities in AI-generated and full-stack systems.
