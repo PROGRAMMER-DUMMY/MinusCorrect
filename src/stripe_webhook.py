@@ -85,13 +85,14 @@ def verify_stripe_signature(
 
 
 class StripeWebhookHandler:
-    """Processes Stripe payment webhook events with idempotency and zero-leak logging.
+    """Processes Stripe payment webhook events with idempotency, zero-leak logging, and Merkle audit trails.
     # verifies: tests/staging/test_stripe_webhook.py
     """
 
-    def __init__(self, webhook_secret: str):
+    def __init__(self, webhook_secret: str, audit_ledger: Optional[Any] = None):
         self.webhook_secret = webhook_secret
         self.processed_event_ids: Set[str] = set()
+        self.audit_ledger = audit_ledger
 
     def process_webhook(
         self,
@@ -126,5 +127,12 @@ class StripeWebhookHandler:
 
         self.processed_event_ids.add(event_id)
         sanitized = sanitize_payment_data(raw_event)
+
+        if self.audit_ledger is not None:
+            self.audit_ledger.record_transaction(
+                entry_id=event_id,
+                event_type=raw_event.get("type", "stripe.webhook"),
+                payload=sanitized,
+            )
 
         return True, "Event processed successfully", sanitized

@@ -314,18 +314,31 @@ def inspect_plugin_status() -> Dict[str, Any]:
             global_plugin_dir / "skills" / name / "SKILL.md"
         ).is_file()
 
-    skills_present = {
-        "minuscorrect": is_skill_present("minuscorrect"),
-        "minuscorrect-council": is_skill_present("minuscorrect-council"),
-        "ask-matt": is_skill_present("ask-matt"),
-        "minuscorrect-security": is_skill_present("minuscorrect-security"),
-        "minuscorrect-research": is_skill_present("minuscorrect-research"),
-        "minuscorrect-anticheat": is_skill_present("minuscorrect-anticheat"),
-        "minuscorrect-spec": is_skill_present("minuscorrect-spec"),
-        "minuscorrect-store": is_skill_present("minuscorrect-store"),
-        "minuscorrect-intake": is_skill_present("minuscorrect-intake"),
-        "minuscorrect-audit": is_skill_present("minuscorrect-audit"),
-    }
+    canonical_skills = [
+        "anti-cheat",
+        "ask-matt",
+        "audit",
+        "council",
+        "doctor",
+        "harness",
+        "intake",
+        "minuscorrect",
+        "research",
+        "rollback",
+        "rule",
+        "security",
+        "spec",
+        "ticket",
+        "verify",
+    ]
+
+    skills_present = {}
+    for skill_name in canonical_skills:
+        present = is_skill_present(skill_name)
+        if not present:
+            legacy_alias = f"minuscorrect-{skill_name}"
+            present = is_skill_present(legacy_alias)
+        skills_present[skill_name] = present
 
     # Check agy plugins list
     agy_imported = False
@@ -374,13 +387,13 @@ def install_plugin() -> tuple[bool, str]:
 
     try:
         global_plugin_dir.mkdir(parents=True, exist_ok=True)
+        # Purge existing global skills directory to ensure stale/prefixed skills are completely cleared
+        plugin_skills_target = global_plugin_dir / "skills"
+        if plugin_skills_target.exists():
+            shutil.rmtree(plugin_skills_target, ignore_errors=True)
         shutil.copytree(source_dir, global_plugin_dir, dirs_exist_ok=True)
-        # Remove legacy deep-research from plugin skills if present
-        plugin_legacy_dr = global_plugin_dir / "skills" / "deep-research"
-        if plugin_legacy_dr.exists():
-            shutil.rmtree(plugin_legacy_dr, ignore_errors=True)
         cleanup_duplicate_loose_skills()
-        return True, f"Successfully installed MinusCorrect plugin with all 10 skills into {global_plugin_dir} (cleaned up loose duplicates in ~/.gemini/config/skills/)."
+        return True, f"Successfully installed MinusCorrect plugin with all 15 canonical skills into {global_plugin_dir} (cleaned up loose duplicates in ~/.gemini/config/skills/)."
     except Exception as exc:
         return False, f"Failed to install plugin: {exc}"
 
