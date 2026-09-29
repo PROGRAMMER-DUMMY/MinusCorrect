@@ -691,6 +691,10 @@ def handle_research(args: argparse.Namespace) -> int:
     print("=" * 76)
     print(f"       MinusCorrect Deep Research Swarm: '{topic}'")
     print("=" * 76)
+    print("[INFO] Offline CLI Mode: Scaffolded Multi-Wave Subagent Dispatch Plan.")
+    print("       To launch live multi-agent web swarms with autonomous browsing,")
+    print("       run '/minuscorrect:research <topic>' inside Antigravity CLI (agy).")
+    print("-" * 76)
     print(f"Wave 0 (Scout):       {len(w0_queries)} Agent (Landscape Reconnaissance & Unknowns)")
     if args.waves >= 2:
         print(f"Wave 1 (Expansion):   {len(w1_queries)} Agents (Orthogonal Architecture & Failure Modes)")
