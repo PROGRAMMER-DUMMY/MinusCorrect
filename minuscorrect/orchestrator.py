@@ -320,6 +320,7 @@ def inspect_plugin_status() -> Dict[str, Any]:
         "audit",
         "council",
         "doctor",
+        "empirical-research-lab",
         "harness",
         "intake",
         "minuscorrect",

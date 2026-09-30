@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "created_at": "2026-09-22T21:23:13.340803+00:00",
-  "updated_at": "2026-09-29T10:45:20.746759+00:00",
+  "updated_at": "2026-09-30T06:01:41.407935+00:00",
   "tickets": {
     "T-001": {
       "id": "T-001",
@@ -590,6 +590,17 @@
       "topic": "Distributed Concurrency Locks",
       "created_at": "2026-09-29T10:45:20.746738+00:00",
       "file": "research/RES-024.md",
+      "findings_count": 12,
+      "sources_count": 10,
+      "consensus_score": 1.0,
+      "consensus_verdict": "Strong Consensus",
+      "contradictions_count": 0
+    },
+    "RES-025": {
+      "id": "RES-025",
+      "topic": "Distributed Concurrency Locks",
+      "created_at": "2026-09-30T06:01:41.407909+00:00",
+      "file": "research/RES-025.md",
       "findings_count": 12,
       "sources_count": 10,
       "consensus_score": 1.0,

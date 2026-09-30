@@ -1,0 +1,2 @@
+description = "Rigorous empirical research protocol: experimental design, provenance receipts, and benchmark verification"
+prompt = "Execute the Empirical Research Lab protocol on {{args}}: 1. Frame hypothesis, primary metrics, baselines, and falsification criteria. 2. Verify integrity against data leakage, metric bugs, and ungrounded comparisons. 3. Generate tamper-evident experiment receipts via make_receipt.py. 4. Enforce claim provenance (MEASURED, CITED, DERIVED, HYPOTHESIS)."

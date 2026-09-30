@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Experiment run receipt",
+  "description": "Schema only. No example values are provided on purpose: every value in a real receipt must come from the run itself (see scripts/make_receipt.py). Receipts are write-once; a rerun produces a new receipt.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "timestamp_utc",
+    "status",
+    "command",
+    "git",
+    "seeds",
+    "inputs",
+    "environment",
+    "results",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "experiment_id": { "type": "string", "description": "Stable id linking the receipt to its pre-registration / plan." },
+    "timestamp_utc": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING_RUN", "COMPLETED", "PARTIAL", "FAILED"],
+      "description": "COMPLETED means the run finished and produced results; it does not mean the results are correct. Provenance labels in the write-up carry that judgment."
+    },
+    "failure_reason": { "type": ["string", "null"], "description": "Required when status is FAILED or PARTIAL (OOM, divergence, crash, timeout, ...)." },
+    "plan_ref": { "type": ["string", "null"], "description": "Path or id of the pre-registration this run belongs to." },
+    "command": { "type": "string", "description": "Exact command line (or notebook cell / entry point) that produced the run." },
+    "notes": { "type": ["string", "null"], "description": "Free text, e.g. 'smoke test on tiny config' or deviations from plan." },
+    "git": {
+      "type": "object",
+      "properties": {
+        "commit": { "type": ["string", "null"] },
+        "dirty": { "type": ["boolean", "null"], "description": "True if uncommitted changes existed. A dirty tree weakens reproducibility." }
+      }
+    },
+    "seeds": { "type": "array", "items": { "type": "integer" }, "description": "All RNG seeds used. Empty only if the run has no randomness (say so in notes)." },
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "configs": { "type": "object", "additionalProperties": { "type": ["string", "null"] }, "description": "path -> sha256 of each config file (null if missing)." },
+        "data": { "type": "object", "additionalProperties": { "type": ["string", "null"] }, "description": "path -> sha256 of each dataset/checkpoint file (null if missing)." }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "python": { "type": "string" },
+        "platform": { "type": "string" },
+        "packages": { "type": "object", "additionalProperties": { "type": ["string", "null"] } },
+        "gpus": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "memory_total_mib": { "type": ["number", "null"] },
+              "driver_version": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "description": "Embedded verbatim from the metrics file the experiment itself wrote. Recommended shape per metric: { value, n, std or ci95, n_seeds, unit }. Metrics without n are flagged by make_receipt.py.",
+      "properties": {
+        "metrics_file": { "type": ["string", "null"] },
+        "metrics_file_sha256": { "type": ["string", "null"] },
+        "metrics": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "value": {},
+              "n": { "type": "integer", "minimum": 1 },
+              "n_seeds": { "type": "integer", "minimum": 1 },
+              "std": { "type": "number" },
+              "ci95": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "unit": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "description": "SHA-256 over the canonical JSON of this receipt excluding this field. Makes edits detectable (tamper-evident, not tamper-proof)."
+    }
+  }
+}
