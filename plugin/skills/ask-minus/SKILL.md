@@ -28,6 +28,7 @@ Instead of requiring developers to manually memorize 16 different CLI subcommand
 | **verify** | Golden test contract protection, anti-swallowing gate, clean diffs | Pre-commit sanity, "verify everything", "clean up debug logs" |
 | **rollback** | Atomic revert of agent commits with post-revert verification | "undo bad agent change", "rollback ticket commit" |
 | **empirical-research-lab** | Tamper-evident experiment receipts (`make_receipt.py`), statistical rigor | "benchmark performance", "evaluate model run", "verify test claims" |
+| **universal-test-architect** | High-signal test case generation, invariants, boundary datasets across 7 domains | "generate test cases", "test case generator", "what could go wrong", "test plan" |
 | **supervisor** | Ephemeral git worktree isolation, 4-loop ceiling, isolate-env | Executing any code mutation safely without breaking main |
 
 ---
@@ -78,6 +79,18 @@ When a user presents a natural language request, `ask-minus` decodes the underly
   2. Phase 2: Tracer-Bullet Tickets DAG (`/to-tickets`) in `.minus/tickets/open/`.
   3. Phase 3: Assign Domain Specialist Personas.
   4. Phase 4: Dispatch unblocked tickets via `invoke_subagent` under supervised worktree containment.
+
+### Intent 5: "Generate test cases / edge cases / QA strategy"
+- **User Prompt Examples**:
+  - *"do we have a test case generator"*
+  - *"generate test cases for this auth service"*
+  - *"what could go wrong with this design"*
+- **Ask-Minus Execution Route**:
+  1. Activate `universal-test-architect` protocol.
+  2. Step 0: Establish the oracle (never derive expected results solely from code under test).
+  3. Step 1: Classify system archetype and load domain references (backend, data engineering, ML/DL, LLM agents, frontend, resilience, compatibility).
+  4. Step 2: Formulate safety, liveness, and quality-of-service invariants.
+  5. Step 3: Emit risk-ranked test cases formatted to `test-case-schema.md` in `tests/staging/`.
 
 ---
 

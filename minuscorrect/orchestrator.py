@@ -335,6 +335,7 @@ def inspect_plugin_status() -> Dict[str, Any]:
         "security",
         "spec",
         "ticket",
+        "universal-test-architect",
         "verify",
     ]
 

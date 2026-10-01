@@ -1,0 +1,10 @@
+description = "Generate risk-ranked, high-signal test cases, failure modes, invariants, and QA strategy for any technical system"
+prompt = """Execute the Universal Test Architect protocol on {{args}} following plugin/skills/universal-test-architect/SKILL.md.
+
+MANDATORY EXECUTION INVARIANTS:
+1. Step 0 (Establish the Oracle): Never derive expected results solely from the code under test. Define explicit safety, liveness, and quality-of-service invariants.
+2. Step 1 (Classify System): Read appropriate domain reference guides in plugin/skills/universal-test-architect/references/ (backend, data engineering, ML/DL, LLM agents, frontend, resilience, compatibility).
+3. Step 2 (Model Invariants): Formulate 5 to 15 numbered invariants (I1, I2, ...).
+4. Step 3 (Boundary & Negative Tests): Consult boundary datasets to generate high-signal test cases targeting edge conditions, race windows, and resource limits.
+5. Format tests using the structured schema in plugin/skills/universal-test-architect/references/test-case-schema.md.
+"""
