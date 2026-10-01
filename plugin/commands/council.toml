@@ -1,2 +1,15 @@
 description = "Run a question, architecture decision, or bug triage through the 5-advisor LLM Council"
-prompt = "Convene the LLM Council to analyze {{args}}. Run independent analysis through the 5 thinking lenses: 1. The Contrarian, 2. The First Principles Thinker, 3. The Expansionist, 4. The Outsider, 5. The Executor. Peer-review each perspective anonymously, synthesize a final verdict, and formulate an Ask-Matt execution plan."
+prompt = """Convene the 5-advisor LLM Council on {{args}} following plugin/skills/council/SKILL.md.
+
+MANDATORY EXECUTION INVARIANTS:
+1. STRICTLY FORBIDDEN to simulate or write the 5 advisor responses inline in your response text.
+2. You MUST immediately call the invoke_subagent tool in parallel with TypeName='self' for all 5 advisors:
+   - The Contrarian (looks for fatal flaws, regressions, AST blast-radius traps)
+   - The First Principles Thinker (strips assumptions, interrogates core invariants)
+   - The Expansionist (identifies 10x upside, systemic leverage, durability)
+   - The Outsider (zero-context sanity check, catches developer ergonomics traps)
+   - The Executor (demands minimal, surgical Monday-morning implementation plan)
+3. Wait for all 5 subagents to report back.
+4. Anonymize their responses as Response A through E and call invoke_subagent for the Peer-Review round.
+5. Synthesize the Chairman's Verdict (Agreements, Clashes, Blind Spots, The One Thing to Do First) and generate the Ask-Minus execution plan.
+"""

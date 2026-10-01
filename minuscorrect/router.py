@@ -18,6 +18,7 @@ class RouteType:
     RULE = "RULE"
     COUNCIL = "COUNCIL"
     SPEC_GENERATE = "SPEC_GENERATE"
+    ASK_MINUS = "ASK_MINUS"
     ASK_MATT = "ASK_MATT"
     INCIDENT = "INCIDENT"
     PRE_LAUNCH_AUDIT = "PRE_LAUNCH_AUDIT"
@@ -197,7 +198,18 @@ def route_intent(query: str, cwd: Optional[Path] = None) -> RoutingDecision:
             extracted_entities={"target_dir": "spec"},
         )
 
-    # 7. Check for Ask-Matt Implementation Plan Intent
+    # 7. Check for Ask-Minus Meta-Orchestrator Intent
+    minus_keywords = ["ask-minus", "ask minus", "minus check", "what should we do", "plan and execute"]
+    if any(kw in text.lower() for kw in minus_keywords):
+        return RoutingDecision(
+            route=RouteType.ASK_MINUS,
+            confidence=0.95,
+            recommended_command=f"minuscorrect ask-minus \"{text[:60]}\"",
+            rationale="Query requests Ask-Minus autonomous intent decoding and ticket DAG generation.",
+            extracted_entities={"idea": text[:60]},
+        )
+
+    # 8. Check for Ask-Matt Implementation Plan Intent
     plan_keywords = ["implement", "tickets", "tracer bullet", "spec to tickets", "decompose", "break down into tickets", "plan"]
     if any(kw in text.lower() for kw in plan_keywords):
         return RoutingDecision(

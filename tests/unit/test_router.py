@@ -72,3 +72,10 @@ def test_route_diff() -> None:
     assert decision.recommended_command == "minuscorrect diff T-003"
     assert decision.extracted_entities.get("ticket_id") == "T-003"
 
+
+def test_route_ask_minus() -> None:
+    decision = route_intent("minus check what should we do next to resolve these failures")
+    assert decision.route == RouteType.ASK_MINUS
+    assert "ask-minus" in decision.recommended_command
+
+

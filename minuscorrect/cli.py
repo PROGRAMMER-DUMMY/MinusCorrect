@@ -107,11 +107,11 @@ def build_parser() -> argparse.ArgumentParser:
     council_parser.add_argument("--json", action="store_true", help="Output council prompt schema in JSON")
     council_parser.add_argument("--decision-engine", choices=["auto", "laya", "local", "jev", "mock"], default="auto", help="Decision engine for council Stage-2 evaluation (default: auto -> laya)")
 
-    # Command: ask-matt
-    ask_matt_parser = subparsers.add_parser("ask-matt", help="Generate Matt Pocock Spec-to-Tickets DAG execution plan")
-    ask_matt_parser.add_argument("idea", nargs="?", default=None, help="Feature request or bug report to decompose")
-    ask_matt_parser.add_argument("--json", action="store_true", help="Output tickets schema in JSON")
-    ask_matt_parser.add_argument("--save", action="store_true", help="Save generated tickets directly to .minus/tickets/open/")
+    # Command: ask-minus (legacy alias: ask-matt)
+    ask_minus_parser = subparsers.add_parser("ask-minus", aliases=["ask-matt"], help="Generate Ask-Minus Spec-to-Tickets DAG execution plan")
+    ask_minus_parser.add_argument("idea", nargs="?", default=None, help="Feature request or bug report to decompose")
+    ask_minus_parser.add_argument("--json", action="store_true", help="Output tickets schema in JSON")
+    ask_minus_parser.add_argument("--save", action="store_true", help="Save generated tickets directly to .minus/tickets/open/")
 
     # Command: ticket
     ticket_parser = subparsers.add_parser("ticket", help="Manage .minus/ second-brain tickets and lifecycle states")
@@ -532,8 +532,8 @@ def main(argv: List[str] = None) -> int:
         return handle_doctor(args)
     elif args.command == "council":
         return handle_council(args)
-    elif args.command == "ask-matt":
-        return handle_ask_matt(args)
+    elif args.command in ("ask-minus", "ask-matt"):
+        return handle_ask_minus(args)
     elif args.command == "plugin":
         return handle_plugin(args)
     elif args.command == "harness":
@@ -784,9 +784,9 @@ def handle_council(args: argparse.Namespace) -> int:
     return 0
 
 
-def handle_ask_matt(args: argparse.Namespace) -> int:
-    from minuscorrect.orchestrator import generate_ask_matt_plan
-    output = generate_ask_matt_plan(
+def handle_ask_minus(args: argparse.Namespace) -> int:
+    from minuscorrect.orchestrator import generate_ask_minus_plan
+    output = generate_ask_minus_plan(
         idea=args.idea,
         as_json=getattr(args, "json", False),
         save_to_store=getattr(args, "save", False),
@@ -795,6 +795,10 @@ def handle_ask_matt(args: argparse.Namespace) -> int:
     if getattr(args, "save", False):
         print("[SUCCESS] Tickets saved directly into .minus/tickets/open/ and registered in index.json")
     return 0
+
+
+# Legacy alias
+handle_ask_matt = handle_ask_minus
 
 
 def handle_ticket(args: argparse.Namespace) -> int:

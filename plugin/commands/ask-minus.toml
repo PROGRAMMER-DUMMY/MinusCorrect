@@ -1,0 +1,16 @@
+description = "Autonomous meta-orchestrator: decodes user intent, routes across all 16 skills, writes ticket DAGs, and dispatches subagents"
+prompt = """Execute the MinusCorrect Ask-Minus protocol on: {{args}}.
+
+MANDATORY EXECUTION INVARIANTS:
+1. Decode the user's root objective and emotional state/frustration (e.g. suspecting agent cheating, idle subagents, architectural deadlock, pre-launch panic).
+2. Consult the Skill Capability Registry in plugin/skills/ask-minus/SKILL.md to select the optimal diagnostic or planning route:
+   - Cheating/tautologies -> Run anti-cheat audit first.
+   - Idle/missing subagents -> Run doctor and inspect invoke_subagent directives.
+   - High-stakes trade-offs -> Convene the 5-advisor Council via invoke_subagent.
+   - Deep investigations -> Dispatch 3-wave Research swarm.
+   - Production readiness -> Run 10-domain Audit and verify --strict.
+3. Formulate an Architectural Spec (/to-spec) with explicit Protected Boundaries (tests/golden/* are strictly read-only).
+4. Break down the solution into a dependency-ordered Tracer-Bullet Ticket DAG (/to-tickets) in .minus/tickets/open/.
+5. Map each ticket to a dedicated Domain Specialist Persona (Process Isolation SRE, Security Auditor, Distributed Systems Engineer, TDD Lead).
+6. Dispatches unblocked tickets to specialized subagents using invoke_subagent with TypeName='self' under MinusCorrect worktree containment.
+"""

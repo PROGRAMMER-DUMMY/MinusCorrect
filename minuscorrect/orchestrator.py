@@ -290,6 +290,10 @@ def generate_ask_matt_plan(
     return "\n".join(lines)
 
 
+# Ask-Minus canonical alias
+generate_ask_minus_plan = generate_ask_matt_plan
+
+
 def get_plugin_source_dir() -> Path:
     """Locate the plugin directory within the MinusCorrect repository."""
     # Check relative to this source file
@@ -317,6 +321,7 @@ def inspect_plugin_status() -> Dict[str, Any]:
     canonical_skills = [
         "anti-cheat",
         "ask-matt",
+        "ask-minus",
         "audit",
         "council",
         "doctor",

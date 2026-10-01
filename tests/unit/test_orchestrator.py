@@ -49,6 +49,14 @@ def test_ask_matt_plan_text_and_json():
     assert data["tracer_bullet_tickets"][0]["id"] == "TICKET-01"
 
 
+def test_ask_minus_plan_alias():
+    from minuscorrect.orchestrator import generate_ask_minus_plan
+    text = generate_ask_minus_plan("Inspect agent cheating and repair")
+    assert "Inspect agent cheating and repair" in text
+    assert "TICKET-01" in text
+
+
+
 def test_get_plugin_source_dir():
     plugin_dir = get_plugin_source_dir()
     assert plugin_dir.is_dir()
